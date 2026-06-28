@@ -618,38 +618,49 @@ function doGet(e) {
   try {
     var params = e ? (e.parameter || {}) : {};
     var action = params.action || '';
+    var callback = params.callback || '';
     if (action === 'fetch') {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
       var sheetName = params.sheet || 'Attendance';
       var sheet = ss.getSheetByName(sheetName);
+      var result;
       if (!sheet || sheet.getLastRow() < 2) {
-        return ContentService.createTextOutput(JSON.stringify({status:'ok',records:[]})).setMimeType(ContentService.MimeType.JSON);
+        result = {status:'ok',records:[]};
+      } else {
+        var lastRow = sheet.getLastRow();
+        var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
+        var records = data.map(function(row) {
+          if (!row[0]) return null;
+          return {
+            empId: String(row[0]),
+            name: String(row[1]),
+            dept: String(row[2]),
+            designation: String(row[3]),
+            mobile: String(row[4]),
+            date: String(row[5]),
+            shift: String(row[6]),
+            loc: String(row[7]) || 'Main',
+            in: row[8] ? String(row[8]) : '',
+            out: row[9] ? String(row[9]) : '',
+            duration: String(row[10])
+          };
+        }).filter(Boolean);
+        result = {status:'ok',records:records};
       }
-      var lastRow = sheet.getLastRow();
-      var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
-      var records = data.map(function(row) {
-        if (!row[0]) return null;
-        return {
-          empId: String(row[0]),
-          name: String(row[1]),
-          dept: String(row[2]),
-          designation: String(row[3]),
-          mobile: String(row[4]),
-          date: String(row[5]),
-          shift: String(row[6]),
-          loc: String(row[7]) || 'Main',
-          in: row[8] ? String(row[8]) : '',
-          out: row[9] ? String(row[9]) : '',
-          duration: String(row[10])
-        };
-      }).filter(Boolean);
-      var output = ContentService.createTextOutput(JSON.stringify({status:'ok',records:records}));
-      output.setMimeType(ContentService.MimeType.JSON);
-      return output;
+      var jsonStr = JSON.stringify(result);
+      // JSONP support — wrap in callback if provided
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + jsonStr + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(jsonStr).setMimeType(ContentService.MimeType.JSON);
     }
-    return ContentService.createTextOutput(JSON.stringify({status:'ok',message:'Attendance Pro API Ready'})).setMimeType(ContentService.MimeType.JSON);
+    var msg = JSON.stringify({status:'ok',message:'Attendance Pro API Ready'});
+    if (callback) return ContentService.createTextOutput(callback + '(' + msg + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+    return ContentService.createTextOutput(msg).setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({status:'error',message:err.toString()})).setMimeType(ContentService.MimeType.JSON);
+    var errMsg = JSON.stringify({status:'error',message:err.toString()});
+    if (params && params.callback) return ContentService.createTextOutput(params.callback + '(' + errMsg + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+    return ContentService.createTextOutput(errMsg).setMimeType(ContentService.MimeType.JSON);
   }
 }`;
 
@@ -747,24 +758,35 @@ function loadGSForm() {
     document.getElementById('vsub').textContent   = DEPT ? 'Sirf '+DEPT+' department | Read-only' : 'Sab departments | Read-only';
     vdept = DEPT;
 
-    // Fetch from Google Sheets if URL set, else fallback to localStorage
-    window.fetchAndRender = async function fetchAndRender() {
+    // Fetch from Google Sheets using JSONP (bypasses CORS)
+    window.fetchAndRender = function() {
+      try { gsSettings = JSON.parse(localStorage.getItem(GSK)) || {}; } catch(e) {}
       const gsUrl = gsSettings.url || '';
       const gsSheet = gsSettings.sheet || 'Attendance';
-      if (gsUrl) {
-        try {
-          const fetchUrl = gsUrl + '?action=fetch&sheet=' + encodeURIComponent(gsSheet) + '&t=' + Date.now();
-          const res = await fetch(fetchUrl);
-          const json = await res.json();
-          if (json.status === 'ok' && Array.isArray(json.records)) {
-            recs = json.records;
-            renderV();
-            return;
-          }
-        } catch(err) { console.warn('GS fetch failed, localStorage fallback', err); }
-      }
-      recs = gS(SK);
-      renderV();
+      if (!gsUrl) { recs = gS(SK); renderV(); return; }
+      const cbName = 'gsCB_' + Date.now();
+      const script = document.createElement('script');
+      const timer = setTimeout(function() {
+        delete window[cbName];
+        try { document.body.removeChild(script); } catch(e) {}
+        recs = gS(SK); renderV();
+      }, 10000);
+      window[cbName] = function(json) {
+        clearTimeout(timer);
+        delete window[cbName];
+        try { document.body.removeChild(script); } catch(e) {}
+        if (json && json.status === 'ok' && Array.isArray(json.records)) {
+          recs = json.records; renderV();
+        } else { recs = gS(SK); renderV(); }
+      };
+      script.onerror = function() {
+        clearTimeout(timer);
+        delete window[cbName];
+        try { document.body.removeChild(script); } catch(e) {}
+        recs = gS(SK); renderV();
+      };
+      script.src = gsUrl + '?action=fetch&sheet=' + encodeURIComponent(gsSheet) + '&callback=' + cbName + '&t=' + Date.now();
+      document.body.appendChild(script);
     }
 
     // Show GS setup banner if no URL configured
