@@ -533,6 +533,7 @@ let filt = [];
 let pdata = [];
 let dch = null, vch = null;
 let editId = null;
+let vdept = '';
 
 // GS Settings
 let gsSettings = {};
@@ -758,34 +759,57 @@ function loadGSForm() {
     document.getElementById('vsub').textContent   = DEPT ? 'Sirf '+DEPT+' department | Read-only' : 'Sab departments | Read-only';
     vdept = DEPT;
 
-    // Fetch from Google Sheets using JSONP (bypasses CORS)
+    // Fetch from Google Sheets via Apps Script (JSONP) with status display
     window.fetchAndRender = function() {
       try { gsSettings = JSON.parse(localStorage.getItem(GSK)) || {}; } catch(e) {}
       const gsUrl = gsSettings.url || '';
       const gsSheet = gsSettings.sheet || 'Attendance';
-      if (!gsUrl) { recs = gS(SK); renderV(); return; }
+
+      // Show loading status
+      const vsub = document.getElementById('vsub');
+      if (vsub) vsub.textContent = '⏳ Data load ho raha hai...';
+
+      if (!gsUrl) {
+        recs = gS(SK); renderV();
+        if (vsub) vsub.textContent = 'localStorage se data (GS URL set nahi)';
+        return;
+      }
+
       const cbName = 'gsCB_' + Date.now();
       const script = document.createElement('script');
+
       const timer = setTimeout(function() {
         delete window[cbName];
         try { document.body.removeChild(script); } catch(e) {}
+        if (vsub) vsub.textContent = '⚠ Timeout — Apps Script se data nahi aaya';
         recs = gS(SK); renderV();
-      }, 10000);
+      }, 15000);
+
       window[cbName] = function(json) {
         clearTimeout(timer);
         delete window[cbName];
         try { document.body.removeChild(script); } catch(e) {}
         if (json && json.status === 'ok' && Array.isArray(json.records)) {
-          recs = json.records; renderV();
-        } else { recs = gS(SK); renderV(); }
+          recs = json.records;
+          renderV();
+          if (vsub) vsub.textContent = 'Sab departments | Read-only | ✅ ' + recs.length + ' records loaded';
+        } else {
+          if (vsub) vsub.textContent = '⚠ GS response error: ' + JSON.stringify(json);
+          recs = gS(SK); renderV();
+        }
       };
+
       script.onerror = function() {
         clearTimeout(timer);
         delete window[cbName];
         try { document.body.removeChild(script); } catch(e) {}
+        if (vsub) vsub.textContent = '⚠ Script load error — Apps Script URL check karo';
         recs = gS(SK); renderV();
       };
-      script.src = gsUrl + '?action=fetch&sheet=' + encodeURIComponent(gsSheet) + '&callback=' + cbName + '&t=' + Date.now();
+
+      const fullUrl = gsUrl + '?action=fetch&sheet=' + encodeURIComponent(gsSheet) + '&callback=' + cbName + '&t=' + Date.now();
+      if (vsub) vsub.textContent = '⏳ Connecting: ' + gsUrl.substring(0,40) + '...';
+      script.src = fullUrl;
       document.body.appendChild(script);
     }
 
@@ -1229,7 +1253,6 @@ function genView(){
 // ══════════════════════════════════════
 // VIEWER MODE — full dashboard, ALL data
 // ══════════════════════════════════════
-let vdept = '';
 function renderV(){
   recs=gS(SK); mdir=gS(MK);
   const date=g('vdate')?g('vdate').value:'';
