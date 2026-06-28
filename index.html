@@ -777,11 +777,16 @@ function loadGSForm() {
           const lines = csv.trim().split('\n');
           if (lines.length < 2) { recs = []; renderV(); if(vsub) vsub.textContent = 'Sab departments | Read-only | 0 records'; return; }
 
-          function parseCSVLine(line) {
+          // Auto-detect separator: tab or comma
+          const firstLine = lines[0];
+          const sep = firstLine.includes('\t') ? '\t' : ',';
+
+          function parseLine(line) {
+            if (sep === '\t') return line.split('\t').map(c => c.trim());
             const result = [];
             let cur = '', inQ = false;
-            for (let ci = 0; ci < line.length; ci++) {
-              const ch = line[ci];
+            for (let i = 0; i < line.length; i++) {
+              const ch = line[i];
               if (ch === '"') { inQ = !inQ; }
               else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
               else { cur += ch; }
@@ -791,43 +796,43 @@ function loadGSForm() {
           }
 
           // Auto-detect columns from header
-          const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase());
-          const ci = {
+          const headers = parseLine(lines[0]).map(h => h.toLowerCase().trim());
+          const fi = {
             empId:  headers.findIndex(h => h.includes('emp')),
             name:   headers.findIndex(h => h === 'name'),
             dept:   headers.findIndex(h => h.includes('dept') || h.includes('department')),
             date:   headers.findIndex(h => h === 'date'),
             shift:  headers.findIndex(h => h === 'shift'),
             loc:    headers.findIndex(h => h.includes('loc')),
-            pIn:    headers.findIndex(h => h.includes('punch in') || h.includes('punch_in')),
-            pOut:   headers.findIndex(h => h.includes('punch out') || h.includes('punch_out')),
-            hours:  headers.findIndex(h => h.includes('hour') || h.includes('duration'))
+            pIn:    headers.findIndex(h => h.includes('punch in') || h.includes('punchin')),
+            pOut:   headers.findIndex(h => h.includes('punch out') || h.includes('punchout')),
+            dur:    headers.findIndex(h => h.includes('hour') || h.includes('duration'))
           };
 
-          // Convert YYYY-MM-DD to DD-MM-YYYY for viewer compatibility
+          // Normalize date to DD-MM-YYYY
           function normDate(d) {
             if (!d) return '';
-            // If already YYYY-MM-DD, convert
-            const m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-            if (m) return m[3]+'-'+m[2]+'-'+m[1];
+            const m1 = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (m1) return m1[3]+'-'+m1[2]+'-'+m1[1];
             return d;
           }
 
           const parsed = [];
           for (let i = 1; i < lines.length; i++) {
-            const c = parseCSVLine(lines[i]);
-            const empId = c[ci.empId >= 0 ? ci.empId : 0];
+            if (!lines[i].trim()) continue;
+            const c = parseLine(lines[i]);
+            const empId = (fi.empId >= 0 ? c[fi.empId] : c[0]) || '';
             if (!empId) continue;
             parsed.push({
               empId:    empId,
-              name:     c[ci.name >= 0 ? ci.name : 1]    || '',
-              dept:     c[ci.dept >= 0 ? ci.dept : 2]    || '',
-              date:     normDate(c[ci.date >= 0 ? ci.date : 4] || ''),
-              shift:    c[ci.shift >= 0 ? ci.shift : 8]  || '',
-              loc:      c[ci.loc >= 0 ? ci.loc : 9]      || 'Main',
-              in:       c[ci.pIn >= 0 ? ci.pIn : 5]      || '',
-              out:      c[ci.pOut >= 0 ? ci.pOut : 6]    || '',
-              duration: c[ci.hours >= 0 ? ci.hours : 7]  || ''
+              name:     (fi.name >= 0  ? c[fi.name]  : c[1])  || '',
+              dept:     (fi.dept >= 0  ? c[fi.dept]  : c[2])  || '',
+              date:     normDate((fi.date >= 0  ? c[fi.date]  : c[5])  || ''),
+              shift:    (fi.shift >= 0 ? c[fi.shift] : c[6])  || '',
+              loc:      (fi.loc >= 0   ? c[fi.loc]   : c[7])  || 'Main',
+              in:       (fi.pIn >= 0   ? c[fi.pIn]   : c[8])  || '',
+              out:      (fi.pOut >= 0  ? c[fi.pOut]  : c[9])  || '',
+              duration: (fi.dur >= 0   ? c[fi.dur]   : c[10]) || ''
             });
           }
 
