@@ -774,12 +774,9 @@ function loadGSForm() {
           return res.text();
         })
         .then(function(csv) {
-          // Parse CSV
           const lines = csv.trim().split('\n');
           if (lines.length < 2) { recs = []; renderV(); if(vsub) vsub.textContent = 'Sab departments | Read-only | 0 records'; return; }
-          // Header: Emp ID,Name,Department,Designation,Mobile,Date,Shift,Location,Punch IN,Punch OUT,Duration,Saved At
-          const parsed = [];
-          // Parse CSV properly handling quoted fields
+
           function parseCSVLine(line) {
             const result = [];
             let cur = '', inQ = false;
@@ -790,39 +787,56 @@ function loadGSForm() {
               else { cur += ch; }
             }
             result.push(cur.trim());
-            return result;
+            return result.map(c => c.replace(/^"|"$/g,'').trim());
           }
-          // Detect columns from header row
-          const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g,'').toLowerCase().trim());
+
+          // Auto-detect columns from header
+          const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase());
           const ci = {
-            empId:    headers.findIndex(h => h.includes('emp id') || h.includes('empid') || h === 'emp'),
-            name:     headers.findIndex(h => h === 'name'),
-            dept:     headers.findIndex(h => h.includes('dept') || h.includes('department')),
-            date:     headers.findIndex(h => h === 'date'),
-            shift:    headers.findIndex(h => h === 'shift'),
-            loc:      headers.findIndex(h => h.includes('loc') || h.includes('location')),
-            pIn:      headers.findIndex(h => h.includes('punch in') || h.includes('punchin')),
-            pOut:     headers.findIndex(h => h.includes('punch out') || h.includes('punchout')),
-            duration: headers.findIndex(h => h.includes('hour') || h.includes('duration'))
+            empId:  headers.findIndex(h => h.includes('emp')),
+            name:   headers.findIndex(h => h === 'name'),
+            dept:   headers.findIndex(h => h.includes('dept') || h.includes('department')),
+            date:   headers.findIndex(h => h === 'date'),
+            shift:  headers.findIndex(h => h === 'shift'),
+            loc:    headers.findIndex(h => h.includes('loc')),
+            pIn:    headers.findIndex(h => h.includes('punch in') || h.includes('punch_in')),
+            pOut:   headers.findIndex(h => h.includes('punch out') || h.includes('punch_out')),
+            hours:  headers.findIndex(h => h.includes('hour') || h.includes('duration'))
           };
+
+          // Convert YYYY-MM-DD to DD-MM-YYYY for viewer compatibility
+          function normDate(d) {
+            if (!d) return '';
+            // If already YYYY-MM-DD, convert
+            const m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (m) return m[3]+'-'+m[2]+'-'+m[1];
+            return d;
+          }
+
+          const parsed = [];
           for (let i = 1; i < lines.length; i++) {
-            const clean = parseCSVLine(lines[i]).map(c => c.replace(/^"|"$/g,'').trim());
-            if (!clean[0] || !clean[ci.empId < 0 ? 0 : ci.empId]) continue;
+            const c = parseCSVLine(lines[i]);
+            const empId = c[ci.empId >= 0 ? ci.empId : 0];
+            if (!empId) continue;
             parsed.push({
-              empId:  ci.empId >= 0    ? clean[ci.empId]    : clean[0],
-              name:   ci.name >= 0     ? clean[ci.name]     : clean[1],
-              dept:   ci.dept >= 0     ? clean[ci.dept]     : clean[2],
-              date:   ci.date >= 0     ? clean[ci.date]     : clean[4],
-              shift:  ci.shift >= 0    ? clean[ci.shift]    : clean[8],
-              loc:    ci.loc >= 0      ? clean[ci.loc]      : 'Main',
-              in:     ci.pIn >= 0      ? clean[ci.pIn]      : clean[5],
-              out:    ci.pOut >= 0     ? clean[ci.pOut]     : clean[6],
-              duration: ci.duration >= 0 ? clean[ci.duration] : ''
+              empId:    empId,
+              name:     c[ci.name >= 0 ? ci.name : 1]    || '',
+              dept:     c[ci.dept >= 0 ? ci.dept : 2]    || '',
+              date:     normDate(c[ci.date >= 0 ? ci.date : 4] || ''),
+              shift:    c[ci.shift >= 0 ? ci.shift : 8]  || '',
+              loc:      c[ci.loc >= 0 ? ci.loc : 9]      || 'Main',
+              in:       c[ci.pIn >= 0 ? ci.pIn : 5]      || '',
+              out:      c[ci.pOut >= 0 ? ci.pOut : 6]    || '',
+              duration: c[ci.hours >= 0 ? ci.hours : 7]  || ''
             });
           }
+
           recs = parsed;
+          // Clear date filter so ALL records show
+          const vdateEl = document.getElementById('vdate');
+          if (vdateEl) vdateEl.value = '';
           renderV();
-          if (vsub) vsub.textContent = 'Sab departments | Read-only | ✅ ' + recs.length + ' records';
+          if (vsub) vsub.textContent = 'Sab departments | Read-only | ✅ ' + recs.length + ' records loaded';
         })
         .catch(function(err) {
           console.warn('CSV fetch failed:', err);
