@@ -766,7 +766,8 @@ function loadGSForm() {
 
       const SHEET_ID = '1Po78BwBYkabon0J0RGg8dTZeN7ZYlP_Gy4dl44P_hbc';
       const GID = '604979772';
-      const csvUrl = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/export?format=csv&gid=' + GID + '&t=' + Date.now();
+      // gviz/tq works without login on public sheets (export?format=csv needs login)
+      const csvUrl = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:csv&gid=' + GID + '&t=' + Date.now();
 
       fetch(csvUrl)
         .then(function(res) {
