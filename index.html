@@ -759,69 +759,63 @@ function loadGSForm() {
     document.getElementById('vsub').textContent   = DEPT ? 'Sirf '+DEPT+' department | Read-only' : 'Sab departments | Read-only';
     vdept = DEPT;
 
-    // Fetch from Google Sheets via Apps Script (JSONP) with status display
+    // Fetch from Google Sheets CSV (public sheet — no CORS issue)
     window.fetchAndRender = function() {
-      try { gsSettings = JSON.parse(localStorage.getItem(GSK)) || {}; } catch(e) {}
-      const gsUrl = gsSettings.url || '';
-      const gsSheet = gsSettings.sheet || 'Attendance';
-
-      // Show loading status
       const vsub = document.getElementById('vsub');
       if (vsub) vsub.textContent = '⏳ Data load ho raha hai...';
 
-      if (!gsUrl) {
-        recs = gS(SK); renderV();
-        if (vsub) vsub.textContent = 'localStorage se data (GS URL set nahi)';
-        return;
-      }
+      const SHEET_ID = '1Po78BwBYkabon0J0RGg8dTZeN7ZYlP_Gy4dl44P_hbc';
+      const SHEET_NAME = 'Attendance';
+      const csvUrl = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(SHEET_NAME) + '&t=' + Date.now();
 
-      const cbName = 'gsCB_' + Date.now();
-      const script = document.createElement('script');
-
-      const timer = setTimeout(function() {
-        delete window[cbName];
-        try { document.body.removeChild(script); } catch(e) {}
-        if (vsub) vsub.textContent = '⚠ Timeout — Apps Script se data nahi aaya';
-        recs = gS(SK); renderV();
-      }, 15000);
-
-      window[cbName] = function(json) {
-        clearTimeout(timer);
-        delete window[cbName];
-        try { document.body.removeChild(script); } catch(e) {}
-        if (json && json.status === 'ok' && Array.isArray(json.records)) {
-          recs = json.records;
+      fetch(csvUrl)
+        .then(function(res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.text();
+        })
+        .then(function(csv) {
+          // Parse CSV
+          const lines = csv.trim().split('\n');
+          if (lines.length < 2) { recs = []; renderV(); if(vsub) vsub.textContent = 'Sab departments | Read-only | 0 records'; return; }
+          // Header: Emp ID,Name,Department,Designation,Mobile,Date,Shift,Location,Punch IN,Punch OUT,Duration,Saved At
+          const parsed = [];
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].match(/(".*?"|[^",]+|(?<=,)(?=,)|^(?=,)|(?<=,)$)/g) || [];
+            const clean = cols.map(c => c.replace(/^"|"$/g,'').trim());
+            if (!clean[0]) continue;
+            parsed.push({
+              empId:  clean[0] || '',
+              name:   clean[1] || '',
+              dept:   clean[2] || '',
+              loc:    clean[7] || 'Main',
+              date:   clean[5] || '',
+              shift:  clean[6] || '',
+              in:     clean[8] || '',
+              out:    clean[9] || '',
+              duration: clean[10] || ''
+            });
+          }
+          recs = parsed;
           renderV();
-          if (vsub) vsub.textContent = 'Sab departments | Read-only | ✅ ' + recs.length + ' records loaded';
-        } else {
-          if (vsub) vsub.textContent = '⚠ GS response error: ' + JSON.stringify(json);
-          recs = gS(SK); renderV();
-        }
-      };
-
-      script.onerror = function() {
-        clearTimeout(timer);
-        delete window[cbName];
-        try { document.body.removeChild(script); } catch(e) {}
-        if (vsub) vsub.textContent = '⚠ Script load error — Apps Script URL check karo';
-        recs = gS(SK); renderV();
-      };
-
-      const fullUrl = gsUrl + '?action=fetch&sheet=' + encodeURIComponent(gsSheet) + '&callback=' + cbName + '&t=' + Date.now();
-      if (vsub) vsub.textContent = '⏳ Connecting: ' + gsUrl.substring(0,40) + '...';
-      script.src = fullUrl;
-      document.body.appendChild(script);
+          if (vsub) vsub.textContent = 'Sab departments | Read-only | ✅ ' + recs.length + ' records';
+        })
+        .catch(function(err) {
+          console.warn('CSV fetch failed:', err);
+          recs = gS(SK);
+          renderV();
+          if (vsub) vsub.textContent = '⚠ Fetch error: ' + err.message;
+        });
     }
 
     // Show GS setup banner if no URL configured
     const vgsSetup = document.getElementById('vgs-setup');
     if (vgsSetup) vgsSetup.style.display = 'none'; // URL hardcoded
 
-    fetchAndRender();
+    window.fetchAndRender();
     const rb2 = document.getElementById('refresh-badge');
     if (rb2) { rb2.style.display='inline'; rb2.textContent='🔄 Auto Refresh: 15s'; }
     // AUTO REFRESH every 15 seconds in viewer — from Google Sheets
-    setInterval(() => { fetchAndRender(); }, 15000);
+    setInterval(() => { window.fetchAndRender && window.fetchAndRender(); }, 15000);
 
   } else {
     // ADMIN mode
