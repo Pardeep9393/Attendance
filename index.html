@@ -745,8 +745,17 @@ function loadGSForm() {
     document.getElementById('vsub').textContent   = DEPT ? 'Sirf '+DEPT+' department | Read-only' : 'Sab departments | Read-only';
     vdept = DEPT;
 
+    // Re-read gsSettings fresh from localStorage (make sure it's loaded)
+    try { gsSettings = JSON.parse(localStorage.getItem(GSK)) || {}; } catch(e) { gsSettings = {}; }
+
+    // Show GS setup banner if no URL configured
+    const vgsSetup = document.getElementById('vgs-setup');
+    if (vgsSetup) vgsSetup.style.display = gsSettings.url ? 'none' : 'block';
+
     // Fetch from Google Sheets if URL set, else fallback to localStorage
-    window.fetchAndRender = async function fetchAndRender() {
+    window.fetchAndRender = async function() {
+      // Always re-read settings in case user just saved URL
+      try { gsSettings = JSON.parse(localStorage.getItem(GSK)) || {}; } catch(e) {}
       const gsUrl = gsSettings.url || '';
       const gsSheet = gsSettings.sheet || 'Attendance';
       if (gsUrl) {
@@ -763,17 +772,13 @@ function loadGSForm() {
       }
       recs = gS(SK);
       renderV();
-    }
+    };
 
-    // Show GS setup banner if no URL configured
-    const vgsSetup = document.getElementById('vgs-setup');
-    if (!gsSettings.url && vgsSetup) vgsSetup.style.display = 'block';
-
-    fetchAndRender();
+    window.fetchAndRender();
     const rb2 = document.getElementById('refresh-badge');
     if (rb2) { rb2.style.display='inline'; rb2.textContent='🔄 Auto Refresh: 15s'; }
     // AUTO REFRESH every 15 seconds in viewer — from Google Sheets
-    setInterval(() => { fetchAndRender(); }, 15000);
+    setInterval(() => { window.fetchAndRender && window.fetchAndRender(); }, 15000);
 
   } else {
     // ADMIN mode
