@@ -396,7 +396,10 @@ tbody td{padding:7px 9px;vertical-align:middle;}
       <p>Department managers ko do — full dashboard dikhega with filters. Scan/delete nahi kar sakte.</p>
       <button class="btn bp" onclick="genView()" style="margin-bottom:11px">🔄 Links Refresh</button>
       <div style="font-size:.73rem;color:var(--mu);margin-bottom:5px">All departments viewer:</div>
-      <div class="lbox2" id="alvlink" onclick="cpTxt(this.textContent)">— Generate karo —</div>
+      <div id="alvlink-wrap" style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:4px">
+        <a id="alvlink" href="#" target="_blank" style="font-size:.74rem;color:var(--cy);word-break:break-all;flex:1">— Generate karo —</a>
+        <button class="btn bc" style="padding:2px 9px;font-size:.71rem" onclick="cpTxt(document.getElementById('alvlink').href)">Copy</button>
+      </div>
       <div style="font-size:.76rem;color:var(--mu);margin-bottom:7px;font-weight:600;margin-top:11px">Department-wise links:</div>
       <div class="dlinks" id="view-links"></div>
     </div>
@@ -667,7 +670,7 @@ function doGet(e) {
     if (params && params.callback) return ContentService.createTextOutput(params.callback + '(' + errMsg + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
     return ContentService.createTextOutput(errMsg).setMimeType(ContentService.MimeType.JSON);
   }
-}
+}`;
 
 function showGSCodeModal() {
   g('gs-code-box').textContent = GS_CODE;
@@ -1440,7 +1443,6 @@ function cpTxt(txt){
 function genScan(){
   const loc=g('linp').value.trim();
   if(!loc){toast('Location name daalo','wa');return;}
-  // Simple URL — NO master data in URL (avoids URI Too Long)
   const url=bUrl()+'?mode=scan&loc='+encodeURIComponent(loc);
   const cont=g('scan-links');
   const old=cont.querySelector('[data-loc="'+loc+'"]');
@@ -1448,7 +1450,7 @@ function genScan(){
   const div=document.createElement('div');
   div.className='dli';div.setAttribute('data-loc',loc);
   const safeUrl=url.replace(/'/g,"\\'");
-  div.innerHTML='<span class="dn">📍 '+loc+'</span><span class="du">'+url+'</span><button class="btn bc" style="padding:2px 9px;font-size:.71rem" onclick="cpTxt(\''+safeUrl+'\')">Copy</button>';
+  div.innerHTML='<span class="dn">📍 '+loc+'</span><a href="'+url+'" target="_blank" style="color:var(--cy);font-size:.73rem;word-break:break-all;flex:1;text-decoration:none">'+url+'</a><button class="btn bc" style="padding:2px 9px;font-size:.71rem" onclick="cpTxt(\''+safeUrl+'\')">Copy</button>';
   cont.appendChild(div);
   cpTxt(url);
   toast(loc+' scanner link copied!','ok');
@@ -1457,14 +1459,15 @@ function genScan(){
 function genView(){
   const base=bUrl();
   const allUrl=base+'?mode=view';
-  if(g('alvlink')) g('alvlink').textContent=allUrl;
+  const alvLink = g('alvlink');
+  if(alvLink){ alvLink.href=allUrl; alvLink.textContent=allUrl; }
   const depts=[...new Set([...recs.map(r=>r.dept),...Object.values(mdir).map(e=>e.dept)].filter(Boolean))].sort();
   const cont=g('view-links'); if(!cont) return;
   if(!depts.length){cont.innerHTML='<div style="font-size:.76rem;color:var(--mu)">Master data ya attendance records hone chahiye</div>';return;}
   cont.innerHTML=depts.map(d=>{
     const url=base+'?mode=view&dept='+encodeURIComponent(d);
     const su=url.replace(/'/g,"\\'");
-    return '<div class="dli"><span class="dn">'+d+'</span><span class="du">'+url+'</span><button class="btn bp" style="padding:2px 9px;font-size:.71rem" onclick="cpTxt(\''+su+'\')">Copy</button></div>';
+    return '<div class="dli"><span class="dn">'+d+'</span><a href="'+url+'" target="_blank" class="du" style="color:var(--cy);text-decoration:none">'+url+'</a><button class="btn bp" style="padding:2px 9px;font-size:.71rem" onclick="cpTxt(\''+su+'\')">Copy</button></div>';
   }).join('');
 }
 
