@@ -834,71 +834,129 @@ function loadGSForm() {
     document.getElementById('clrAllBtn').style.display = 'none';
     const bar = document.getElementById('mbar');
 
-    // Scanner pe Master Data auto-load karo — pehle localStorage, phir GS se fetch
     function updateMasterBar() {
       const count = Object.keys(mdir).length;
       if (count > 0) {
         bar.className = 'mbar ok';
-        bar.innerHTML = '✅ Master ready — ' + count + ' employees loaded | <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:6px" onclick="scannerFetchMaster()">🔄 Refresh</button>';
+        bar.innerHTML = `✅ Master ready — ${count} employees loaded &nbsp;
+          <button class="btn bc" style="padding:1px 8px;font-size:.72rem" onclick="showScanMasterPanel()">📋 Update</button>
+          <button class="btn bp" style="padding:1px 8px;font-size:.72rem" onclick="clearScanMaster()">🗑 Clear</button>`;
       } else {
         bar.className = 'mbar er';
-        bar.innerHTML = '⚠ Master Data nahi mila — <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:4px" onclick="scannerFetchMaster()">📊 GS se Load karo</button>';
+        bar.innerHTML = `⚠ Master Data nahi hai — Employee names/departments nahi dikhenge
+          <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:6px" onclick="showScanMasterPanel()">📂 Master Upload karo</button>`;
       }
-      const syncBtn = document.getElementById('syncbtn');
-      if (syncBtn) syncBtn.style.display = count > 0 ? 'none' : 'block';
     }
 
-    // GS se master fetch karo (scanner device pe)
-    window.scannerFetchMaster = async function() {
-      if (!gsSettings.url) {
-        bar.className = 'mbar er';
-        bar.innerHTML = '⚠ GS URL set nahi — Admin se Apps Script URL lo aur neeche daalo: <br><div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><input id="scan-gs-url" class="fi sel" style="flex:1;min-width:200px;padding:5px 8px;font-size:.78rem" placeholder="https://script.google.com/macros/s/.../exec"><button class="btn bc" style="padding:3px 10px" onclick="saveScanGsUrl()">💾 Save & Load</button></div>';
-        const syncBtn = document.getElementById('syncbtn');
-        if (syncBtn) syncBtn.style.display = 'block';
-        return;
+    // ── Master Upload Panel (CSV ya paste) ──
+    window.showScanMasterPanel = function() {
+      const existing = document.getElementById('scan-master-panel');
+      if (existing) { existing.remove(); return; }
+      const panel = document.createElement('div');
+      panel.id = 'scan-master-panel';
+      panel.style.cssText = 'background:var(--c2);border:1px solid var(--cy);border-radius:10px;padding:14px 16px;margin-top:10px;';
+      panel.innerHTML = `
+        <div style="font-weight:700;color:var(--cy);margin-bottom:10px;font-size:.85rem">📂 Master Data Upload — Scanner Device</div>
+
+        <div style="font-size:.76rem;color:var(--mu);margin-bottom:8px">
+          <b>Option 1:</b> CSV file upload karo (EmpID,Name,Department columns chahiye)
+        </div>
+        <input type="file" id="scan-csv-file" accept=".csv" style="font-size:.76rem;color:var(--ft);margin-bottom:10px;display:block"
+          onchange="loadScanCSV(this)">
+
+        <div style="font-size:.76rem;color:var(--mu);margin:10px 0 5px">
+          <b>Option 2:</b> CSV data paste karo (header row ke saath):
+        </div>
+        <textarea id="scan-csv-paste" rows="5" style="width:100%;background:var(--c3);color:var(--ft);border:1px solid var(--bd);border-radius:6px;padding:6px 8px;font-size:.72rem;font-family:monospace;box-sizing:border-box"
+          placeholder="EmpID,Name,Department,Designation,Mobile&#10;FKN-0001,Rahul Kumar,Idam Natural Wellness,...&#10;FKN-0002,Priya Sharma,Lagom Labs,..."></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn bc" style="padding:4px 14px" onclick="parseScanCSV()">✅ Load karo</button>
+          <button class="btn ba" style="padding:4px 14px" onclick="document.getElementById('scan-master-panel').remove()">✖ Close</button>
+        </div>
+        <div id="scan-master-status" style="margin-top:8px;font-size:.76rem"></div>`;
+      bar.after(panel);
+    };
+
+    window.loadScanCSV = function(input) {
+      const file = input.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        document.getElementById('scan-csv-paste').value = e.target.result;
+        document.getElementById('scan-master-status').innerHTML = '<span style="color:var(--cy)">File loaded — "Load karo" dabao</span>';
+      };
+      reader.readAsText(file);
+    };
+
+    window.parseScanCSV = function() {
+      const raw = (document.getElementById('scan-csv-paste')||{}).value||'';
+      const st  = document.getElementById('scan-master-status');
+      if (!raw.trim()) { st.innerHTML='<span style="color:#f87">Koi data nahi!</span>'; return; }
+      const lines = raw.trim().split(/\r?\n/);
+      if (lines.length < 2) { st.innerHTML='<span style="color:#f87">Sirf header hai, data nahi!</span>'; return; }
+      // Parse header
+      function splitCSV(line) {
+        const res=[]; let cur='',inQ=false;
+        for (let ch of line) { if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){res.push(cur.trim());cur='';}else{cur+=ch;} }
+        res.push(cur.trim()); return res.map(c=>c.replace(/^"|"$/g,'').trim());
       }
-      bar.className = 'mbar';
-      bar.innerHTML = '⏳ GS se Master Data load ho raha hai...';
+      const hdrs = splitCSV(lines[0]).map(h=>h.toLowerCase().replace(/\s+/g,''));
+      const ci = {
+        id:   hdrs.findIndex(h=>h.includes('empid')||h.includes('id')||h==='emp'),
+        name: hdrs.findIndex(h=>h.includes('name')),
+        dept: hdrs.findIndex(h=>h.includes('dept')||h.includes('department')),
+        desig:hdrs.findIndex(h=>h.includes('desig')),
+        mob:  hdrs.findIndex(h=>h.includes('mob')||h.includes('phone')||h.includes('mobile')),
+      };
+      if (ci.id<0||ci.name<0) { st.innerHTML='<span style="color:#f87">EmpID ya Name column nahi mila! Header check karo.</span>'; return; }
+      let added=0, skipped=0;
+      lines.slice(1).forEach(line=>{
+        if (!line.trim()) return;
+        const c = splitCSV(line);
+        const id = (c[ci.id]||'').toUpperCase().trim();
+        const name = (c[ci.name]||'').trim();
+        if (!id||!name) { skipped++; return; }
+        mdir[id] = {
+          name,
+          dept:  ci.dept>=0  ? (c[ci.dept]||'').trim()  : '',
+          designation: ci.desig>=0 ? (c[ci.desig]||'').trim() : '',
+          mobile: ci.mob>=0  ? (c[ci.mob]||'').trim()   : '',
+        };
+        added++;
+      });
+      sS(MK, mdir);
+      refreshDepts();
+      st.innerHTML = `<span style="color:#4ade80">✅ ${added} employees loaded! ${skipped?skipped+' skipped':''}</span>`;
+      setTimeout(()=>{ updateMasterBar(); document.getElementById('scan-master-panel')?.remove(); toast('✅ '+added+' employees master mein add ho gaye!','ok'); }, 1200);
+    };
+
+    window.clearScanMaster = function() {
+      if (!confirm('Master data clear karna chahte ho?')) return;
+      mdir = {}; sS(MK, mdir); updateMasterBar();
+      toast('Master data clear ho gaya','wa');
+    };
+
+    // Auto-try GS if URL is set
+    window.scannerFetchMaster = async function() {
+      if (!gsSettings.url) { updateMasterBar(); return; }
+      bar.className = 'mbar'; bar.innerHTML = '⏳ GS se Master Data load ho raha hai...';
       try {
         const res = await fetch(gsSettings.url + '?action=fetchMaster&t=' + Date.now(), {cache:'no-store'});
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
-        if (data.status !== 'ok') throw new Error(data.message || 'API error');
-        const employees = data.employees || {};
-        const count = Object.keys(employees).length;
-        if (count === 0) {
-          bar.className = 'mbar er';
-          bar.innerHTML = '⚠ GS ke "M" tab mein koi data nahi mila. Admin se pehle master push karwao. <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:4px" onclick="scannerFetchMaster()">🔄 Retry</button>';
-          return;
+        if (data.status !== 'ok') throw new Error(data.message||'API error');
+        const employees = data.employees||{};
+        if (Object.keys(employees).length) {
+          Object.assign(mdir, employees);
+          sS(MK, mdir);
+          refreshDepts();
+          toast('✅ GS se ' + Object.keys(employees).length + ' employees loaded!','ok');
         }
-        // Merge into local mdir
-        Object.assign(mdir, employees);
-        sS(MK, mdir);
-        refreshDepts();
-        updateMasterBar();
-        toast('✅ ' + count + ' employees GS se load ho gaye!', 'ok');
-      } catch(e) {
-        bar.className = 'mbar er';
-        bar.innerHTML = '❌ GS fetch failed: ' + e.message + ' <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:4px" onclick="scannerFetchMaster()">🔄 Retry</button>';
-        console.error('Scanner master fetch error', e);
-      }
-    };
-
-    window.saveScanGsUrl = function() {
-      const inp = document.getElementById('scan-gs-url');
-      if (!inp || !inp.value.trim()) { toast('URL daalo pehle!','wa'); return; }
-      gsSettings.url = inp.value.trim();
-      gsSettings.sheet = gsSettings.sheet || 'Attendance';
-      sS(GSK, gsSettings);
-      toast('✅ URL save ho gaya!','ok');
-      window.scannerFetchMaster();
+      } catch(e) { console.warn('GS master fetch failed:', e.message); }
+      updateMasterBar();
     };
 
     updateMasterBar();
-    // Auto-fetch from GS if no local master OR GS URL configured
-    if (Object.keys(mdir).length === 0 || gsSettings.url) {
-      setTimeout(() => window.scannerFetchMaster(), 500);
-    }
+    if (gsSettings.url) setTimeout(()=>window.scannerFetchMaster(), 500);
 
   } else if (MODE === 'view') {
     badge.className = 'mbadge mview'; badge.textContent = '👁 Viewer';
