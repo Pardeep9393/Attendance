@@ -585,10 +585,6 @@ const GS_CODE = `function doPost(e) {
 
     if (data.action === 'punch') {
       var r = data.record;
-      var emp = data.emp || {};
-      // dept: always prefer record.dept, fallback emp.dept
-      var dept = (r.dept && r.dept !== 'Unknown') ? r.dept : (emp.dept || r.dept || 'Unknown');
-      var name = r.name || emp.name || r.empId;
       // Find existing row for this emp+date+shift
       var lastRow = sheet.getLastRow();
       var found = -1;
@@ -600,32 +596,15 @@ const GS_CODE = `function doPost(e) {
           if (ids[i][0] == r.empId && dates[i][0] == r.date && shifts[i][0] == r.shift) { found = i+2; break; }
         }
       }
+      var emp = data.emp || {};
       if (found === -1) {
-        sheet.appendRow([r.empId, name, dept, emp.designation||'', emp.mobile||'', r.date, r.shift, r.loc||'Main', fT(r.in), fT(r.out), dur(r.in,r.out), new Date().toLocaleString()]);
+        sheet.appendRow([r.empId, r.name, r.dept, emp.designation||'', emp.mobile||'', r.date, r.shift, r.loc||'Main', fT(r.in), fT(r.out), dur(r.in,r.out), new Date().toLocaleString()]);
       } else {
-        // Update dept/name if they were Unknown before
-        var existingDept = sheet.getRange(found, 3).getValue();
-        if (!existingDept || existingDept === 'Unknown') sheet.getRange(found, 3).setValue(dept);
-        if (name && name !== r.empId) sheet.getRange(found, 2).setValue(name);
         sheet.getRange(found, 9).setValue(fT(r.in));
         sheet.getRange(found, 10).setValue(fT(r.out));
         sheet.getRange(found, 11).setValue(dur(r.in,r.out));
         sheet.getRange(found, 12).setValue(new Date().toLocaleString());
       }
-    }
-
-    if (data.action === 'saveMaster') {
-      var mSheet = ss.getSheetByName('M');
-      if (!mSheet) { mSheet = ss.insertSheet('M'); }
-      mSheet.clearContents();
-      mSheet.appendRow(['EmployeeID','Name','Department','Designation','Mobile']);
-      mSheet.getRange(1,1,1,5).setFontWeight('bold').setBackground('#06B6D4').setFontColor('#000');
-      var employees = data.employees || {};
-      Object.keys(employees).forEach(function(empId) {
-        var e = employees[empId];
-        mSheet.appendRow([empId, e.name||'', e.dept||'', e.designation||'', e.mobile||'']);
-      });
-      return ContentService.createTextOutput(JSON.stringify({status:'ok',rows:Object.keys(employees).length})).setMimeType(ContentService.MimeType.JSON);
     }
 
     if (data.action === 'bulkSync') {
@@ -648,25 +627,6 @@ function doGet(e) {
     var params = e ? (e.parameter || {}) : {};
     var action = params.action || '';
     var callback = params.callback || '';
-    if (action === 'fetchMaster') {
-      var ss2 = SpreadsheetApp.getActiveSpreadsheet();
-      var mSheet2 = ss2.getSheetByName('M');
-      if (!mSheet2 || mSheet2.getLastRow() < 2) {
-        return ContentService.createTextOutput(JSON.stringify({status:'ok',employees:{}})).setMimeType(ContentService.MimeType.JSON);
-      }
-      var mData = mSheet2.getRange(2, 1, mSheet2.getLastRow()-1, 5).getValues();
-      var employees = {};
-      mData.forEach(function(row) {
-        if (!row[0]) return;
-        employees[String(row[0]).toUpperCase().trim()] = {
-          name: String(row[1]||''),
-          dept: String(row[2]||''),
-          designation: String(row[3]||''),
-          mobile: String(row[4]||'')
-        };
-      });
-      return ContentService.createTextOutput(JSON.stringify({status:'ok',employees:employees})).setMimeType(ContentService.MimeType.JSON);
-    }
     if (action === 'fetch') {
       var ss = SpreadsheetApp.getActiveSpreadsheet();
       var sheetName = params.sheet || 'Attendance';
@@ -813,19 +773,10 @@ async function sendToGS(rec) {
   if (!gsSettings.url) return;
   try {
     const emp = mdir[rec.empId] || {};
-    // Always use rec.dept (set at scan time) as primary — fallback to emp.dept
-    const dept = rec.dept || emp.dept || 'Unknown';
-    const name = rec.name || emp.name || rec.empId;
-    const payload = {
-      action: 'punch',
-      record: Object.assign({}, rec, {dept, name}),
-      emp: Object.assign({}, emp, {dept, name}),
-      sheet: gsSettings.sheet || 'Attendance'
-    };
     await fetch(gsSettings.url, {
       method:'POST', mode:'no-cors',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
+      body: JSON.stringify({action:'punch', record:rec, emp, sheet: gsSettings.sheet||'Attendance'})
     });
     // no-cors so we can't read response — that's ok
   } catch(e) { console.warn('GS send failed', e); }
@@ -1169,14 +1120,7 @@ function doScan() {
   const sh  = shift(now);
   const loc = LOC || 'Main';
   const emp = mdir[id];
-  const deptSel = g('dsel') ? g('dsel').value : '';
-
-  // Warn if master not loaded on this device
-  if (!emp && !deptSel && MODE === 'scan') {
-    toast('⚠ '+id+' master mein nahi — Admin se Master sync karwao (dept Unknown hoga)','wa');
-  }
-
-  const dept = emp ? emp.dept : (deptSel || 'Unknown');
+  const dept = emp ? emp.dept : (g('dsel').value || 'Unknown');
   const name = emp ? emp.name : (g('enm').value.trim() || id);
 
   if (!emp) { mdir[id]={name,dept,designation:'',mobile:''}; sS(MK,mdir); refreshDepts(); }
@@ -1189,8 +1133,6 @@ function doScan() {
     toast('✅ PUNCH IN — '+name+' ('+dept+') | '+sh+' @ '+loc,'ok');
   } else if (!sess.out) {
     sess.out = now.toISOString(); sess.outLoc = loc;
-    // Preserve dept on punch out if it was Unknown and now master is loaded
-    if ((!sess.dept || sess.dept === 'Unknown') && emp) sess.dept = emp.dept;
     anim('wa'); showLast(sess,'OUT');
     toast('🔴 PUNCH OUT — '+name+' | '+dur(sess.in,sess.out),'ok');
   } else {
