@@ -785,7 +785,38 @@ function loadGSForm() {
         delete window[cbName];
         try{document.body.removeChild(script);}catch(e){}
         if(json && json.status==='ok' && json.records && json.records.length > 0) {
-          recs = json.records;
+          // Fix date and time formats from Google Sheets Date objects
+          recs = json.records.map(function(r) {
+            function fmtDate(d) {
+              if (!d) return '';
+              var dt = new Date(d);
+              if (isNaN(dt.getTime())) return String(d);
+              var dd = String(dt.getDate()).padStart(2,'0');
+              var mm = String(dt.getMonth()+1).padStart(2,'0');
+              var yyyy = dt.getFullYear();
+              return dd+'-'+mm+'-'+yyyy;
+            }
+            function fmtTime(d) {
+              if (!d) return '';
+              var dt = new Date(d);
+              if (isNaN(dt.getTime())) return String(d);
+              // Ignore 1899 dates (Google Sheets time-only values)
+              var hh = String(dt.getHours()).padStart(2,'0');
+              var mi = String(dt.getMinutes()).padStart(2,'0');
+              return hh+':'+mi;
+            }
+            return {
+              empId:    r.empId,
+              name:     r.name,
+              dept:     r.dept,
+              date:     fmtDate(r.date),
+              shift:    r.shift,
+              loc:      r.loc,
+              in:       fmtTime(r.in),
+              out:      fmtTime(r.out),
+              duration: r.duration
+            };
+          });
           var vdateEl = document.getElementById('vdate');
           if(vdateEl) vdateEl.value = '';
           renderV();
