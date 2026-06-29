@@ -287,6 +287,7 @@ tbody td{padding:7px 9px;vertical-align:middle;}
     </div>
     <div style="display:flex;gap:7px;flex-wrap:wrap">
       <button class="btn ba" onclick="dlTpl()">📄 Sample CSV</button>
+      <button class="btn bc" onclick="syncMasterFromGS()" title="Google Sheet ke M tab se Master Data fetch karo">📊 GS se Sync</button>
       <button class="btn bg" onclick="dlMaster()">⬇ Export</button>
       <button class="btn br" onclick="clrMaster()">🗑 Clear</button>
     </div>
@@ -294,7 +295,8 @@ tbody td{padding:7px 9px;vertical-align:middle;}
 
   <div class="sync-info">
     <b>Auto Sync:</b> Master data sab tabs (Scanner, Viewer) pe automatically available hai — same browser mein.<br>
-    <b>Alag device?</b> Scanner link generate karne se pehle master upload karo. Scanner device pe "Manual Sync" button se CSV paste karo.
+    <b>Alag device?</b> Scanner link generate karne se pehle master upload karo. Scanner device pe "Manual Sync" button se CSV paste karo.<br>
+    <b>📊 GS se Sync:</b> Google Sheet ke <b style="color:var(--cy)">"M"</b> tab mein master data hai? Upar "GS se Sync" button dabaao — seedha fetch ho jayega.
   </div>
 
   <div class="fbox">
@@ -691,6 +693,75 @@ function testGS() {
   fetch(url, {method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'test'})})
     .then(()=>{ const el=g('gs-status'); if(el) el.innerHTML='<span style="color:var(--gn)">✅ Request bheji gayi (no-cors mode) — Apps Script execution log check karo</span>'; toast('Test request sent!','ok'); })
     .catch(e=>{ toast('Error: '+e.message,'wa'); });
+}
+
+// ══════════════════════════════════════
+// MASTER SYNC FROM GOOGLE SHEETS "M" TAB
+// ══════════════════════════════════════
+async function syncMasterFromGS() {
+  // Fetch Master data from Google Sheet public CSV (gid=604979772 is Attendance; M sheet gid auto-detect)
+  // We use the spreadsheet public CSV export for "M" sheet
+  const SPREADSHEET_ID = '1Po78BwBYkabon0J0RGg8dTZeN7ZYlP_Gy4dl44P_hbc';
+  // Try to find "M" sheet — user must share sheet as public
+  // We try gviz with sheet name "M"
+  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=M&t=${Date.now()}`;
+  toast('📊 Google Sheets se Master Data fetch ho raha hai...','ok');
+  try {
+    const res = await fetch(url, {cache:'no-store'});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const csv = await res.text();
+    const lines = csv.trim().split('\n');
+    if (lines.length < 2) { toast('M sheet mein koi data nahi mila!','wa'); return; }
+    // Parse CSV
+    const sep = lines[0].indexOf('\t') >= 0 ? '\t' : ',';
+    function pl(line) {
+      if(sep==='\t') return line.split('\t').map(c=>c.trim());
+      const res=[];let cur='',inQ=false;
+      for(let i=0;i<line.length;i++){
+        const ch=line[i];
+        if(ch==='"'){inQ=!inQ;}
+        else if(ch===','&&!inQ){res.push(cur);cur='';}
+        else{cur+=ch;}
+      }
+      res.push(cur);
+      return res.map(c=>c.replace(/^"|"$/g,'').trim());
+    }
+    const hdrs = pl(lines[0]).map(h=>h.toLowerCase().replace(/[\s_]/g,''));
+    // Column mapping — flexible
+    const al = {
+      employeeid:['employeeid','emp_id','empid','employee_id','id','code','empcode'],
+      name:['name','employeename','emp_name','fullname','full_name'],
+      department:['department','dept','department_name'],
+      designation:['designation','desig','position','role'],
+      mobile:['mobile','phone','contact','mobileno']
+    };
+    const cm = {};
+    hdrs.forEach((h,i)=>Object.entries(al).forEach(([k,vs])=>{if(vs.includes(h))cm[k]=i;}));
+    if(cm.employeeid===undefined||cm.name===undefined||cm.department===undefined){
+      // Try positional fallback: col0=ID, col1=Name, col2=Dept
+      if(hdrs.length>=3){cm.employeeid=0;cm.name=1;cm.department=2;if(hdrs.length>3)cm.designation=3;if(hdrs.length>4)cm.mobile=4;}
+      else{toast('M sheet mein EmployeeID, Name, Department columns nahi mile!','wa');return;}
+    }
+    let added=0,updated=0;
+    for(let i=1;i<lines.length;i++){
+      if(!lines[i].trim()) continue;
+      const c=pl(lines[i]);
+      const empId=(c[cm.employeeid]||'').toUpperCase().trim();
+      const name=(c[cm.name]||'').trim();
+      const dept=(c[cm.department]||'').trim();
+      if(!empId||!name) continue;
+      const desig=cm.designation!==undefined?(c[cm.designation]||'').trim():'';
+      const mob=cm.mobile!==undefined?(c[cm.mobile]||'').trim():'';
+      if(mdir[empId])updated++;else added++;
+      mdir[empId]={name,dept,designation:desig,mobile:mob};
+    }
+    sS(MK,mdir);
+    refreshDepts();renderM();updStats();
+    toast(`✅ Master Sync done! ${added} naye + ${updated} update (${added+updated} total)`,'ok');
+  } catch(e) {
+    toast('❌ Sync failed: '+e.message+' — Sheet "M" public share check karo','wa');
+    console.error('Master GS sync error',e);
+  }
 }
 
 async function sendToGS(rec) {
