@@ -754,7 +754,7 @@ function loadGSForm() {
     tabs.style.display = 'none';
     document.getElementById('pg-att').classList.remove('on');
     document.getElementById('vmode').style.display = 'block';
-    document.getElementById('vdate').value = dStr(new Date());
+    document.getElementById('vdate').value = ''; // No default date filter — show all records
     document.getElementById('vtitle').textContent = DEPT ? DEPT+' — Attendance Dashboard' : 'Full Attendance Dashboard';
     document.getElementById('vsub').textContent   = DEPT ? 'Sirf '+DEPT+' department | Read-only' : 'Sab departments | Read-only';
     vdept = DEPT;
