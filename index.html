@@ -667,7 +667,7 @@ function doGet(e) {
     if (params && params.callback) return ContentService.createTextOutput(params.callback + '(' + errMsg + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
     return ContentService.createTextOutput(errMsg).setMimeType(ContentService.MimeType.JSON);
   }
-}`;
+}
 
 function showGSCodeModal() {
   g('gs-code-box').textContent = GS_CODE;
@@ -830,13 +830,71 @@ function loadGSForm() {
     document.getElementById('pg-att').classList.add('on');
     document.getElementById('clrAllBtn').style.display = 'none';
     const bar = document.getElementById('mbar');
-    if (Object.keys(mdir).length > 0) {
-      bar.className = 'mbar ok';
-      bar.textContent = '✅ Master ready — ' + Object.keys(mdir).length + ' employees';
-    } else {
-      bar.className = 'mbar er';
-      bar.textContent = '⚠ Master Data nahi mila — Admin se CSV lo aur import karo';
-      document.getElementById('syncbtn').style.display = 'block';
+
+    // Scanner pe Master Data auto-load karo — pehle localStorage, phir GS se fetch
+    function updateMasterBar() {
+      const count = Object.keys(mdir).length;
+      if (count > 0) {
+        bar.className = 'mbar ok';
+        bar.innerHTML = '✅ Master ready — ' + count + ' employees loaded | <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:6px" onclick="scannerFetchMaster()">🔄 Refresh</button>';
+      } else {
+        bar.className = 'mbar er';
+        bar.innerHTML = '⚠ Master Data nahi mila — <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:4px" onclick="scannerFetchMaster()">📊 GS se Load karo</button>';
+      }
+      const syncBtn = document.getElementById('syncbtn');
+      if (syncBtn) syncBtn.style.display = count > 0 ? 'none' : 'block';
+    }
+
+    // GS se master fetch karo (scanner device pe)
+    window.scannerFetchMaster = async function() {
+      if (!gsSettings.url) {
+        bar.className = 'mbar er';
+        bar.innerHTML = '⚠ GS URL set nahi — Admin se Apps Script URL lo aur neeche daalo: <br><div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><input id="scan-gs-url" class="fi sel" style="flex:1;min-width:200px;padding:5px 8px;font-size:.78rem" placeholder="https://script.google.com/macros/s/.../exec"><button class="btn bc" style="padding:3px 10px" onclick="saveScanGsUrl()">💾 Save & Load</button></div>';
+        const syncBtn = document.getElementById('syncbtn');
+        if (syncBtn) syncBtn.style.display = 'block';
+        return;
+      }
+      bar.className = 'mbar';
+      bar.innerHTML = '⏳ GS se Master Data load ho raha hai...';
+      try {
+        const res = await fetch(gsSettings.url + '?action=fetchMaster&t=' + Date.now(), {cache:'no-store'});
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (data.status !== 'ok') throw new Error(data.message || 'API error');
+        const employees = data.employees || {};
+        const count = Object.keys(employees).length;
+        if (count === 0) {
+          bar.className = 'mbar er';
+          bar.innerHTML = '⚠ GS ke "M" tab mein koi data nahi mila. Admin se pehle master push karwao. <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:4px" onclick="scannerFetchMaster()">🔄 Retry</button>';
+          return;
+        }
+        // Merge into local mdir
+        Object.assign(mdir, employees);
+        sS(MK, mdir);
+        refreshDepts();
+        updateMasterBar();
+        toast('✅ ' + count + ' employees GS se load ho gaye!', 'ok');
+      } catch(e) {
+        bar.className = 'mbar er';
+        bar.innerHTML = '❌ GS fetch failed: ' + e.message + ' <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:4px" onclick="scannerFetchMaster()">🔄 Retry</button>';
+        console.error('Scanner master fetch error', e);
+      }
+    };
+
+    window.saveScanGsUrl = function() {
+      const inp = document.getElementById('scan-gs-url');
+      if (!inp || !inp.value.trim()) { toast('URL daalo pehle!','wa'); return; }
+      gsSettings.url = inp.value.trim();
+      gsSettings.sheet = gsSettings.sheet || 'Attendance';
+      sS(GSK, gsSettings);
+      toast('✅ URL save ho gaya!','ok');
+      window.scannerFetchMaster();
+    };
+
+    updateMasterBar();
+    // Auto-fetch from GS if no local master OR GS URL configured
+    if (Object.keys(mdir).length === 0 || gsSettings.url) {
+      setTimeout(() => window.scannerFetchMaster(), 500);
     }
 
   } else if (MODE === 'view') {
