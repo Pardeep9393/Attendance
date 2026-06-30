@@ -799,33 +799,41 @@ async function doBulkSync() {
 
 // Admin pe GS se data pull karo (scanner ka data admin pe aayega)
 async function pullFromGS() {
-  if (!gsSettings.url) { toast('GS URL nahi set','wa'); return; }
-  toast('⏳ GS se data pull ho raha hai...','ok');
+  if (!gsSettings.url) {
+    toast('⚠ GS URL set nahi hai — Links tab → Google Sheets section mein URL daalo', 'wa');
+    // Auto switch to links tab
+    showTab('links');
+    setTimeout(() => {
+      const el = document.getElementById('gs-url');
+      if (el) { el.focus(); el.scrollIntoView({behavior:'smooth', block:'center'}); }
+    }, 300);
+    return;
+  }
+  toast('⏳ GS se data pull ho raha hai...', 'ok');
   try {
-    const res = await fetch(gsSettings.url + '?action=fetch&sheet='+(gsSettings.sheet||'Attendance')+'&t='+Date.now(), {cache:'no-store'});
-    if (!res.ok) throw new Error('HTTP '+res.status);
+    const url = gsSettings.url + '?action=fetch&sheet=' + encodeURIComponent(gsSettings.sheet||'Attendance') + '&t=' + Date.now();
+    const res = await fetch(url, {cache:'no-store'});
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' — Apps Script redeploy karo (Anyone access)');
     const data = await res.json();
-    if (data.status !== 'ok') throw new Error(data.message||'API error');
+    if (data.status !== 'ok') throw new Error(data.message || 'API error');
     const gsRecs = data.records || [];
-    if (!gsRecs.length) { toast('GS mein koi data nahi mila','wa'); return; }
-    // Merge — local records + GS records, deduplicate by empId+date+shift
+    if (!gsRecs.length) { toast('⚠ GS mein koi data nahi mila — scanners ne sync kiya?', 'wa'); return; }
+    // Merge — local + GS, deduplicate by empId+date+shift
     const map = {};
-    // Pehle local data
-    recs.forEach(r => { const k=r.empId+'|'+r.date+'|'+r.shift; map[k]=r; });
-    // Phir GS data (GS ka data override karega agar newer ho)
+    recs.forEach(r => { const k = r.empId+'|'+r.date+'|'+r.shift; map[k] = r; });
     gsRecs.forEach(r => {
-      const k=r.empId+'|'+r.date+'|'+r.shift;
-      if (!map[k]) map[k]=r; // sirf naya add karo
-      else {
-        // GS mein out hai lekin local mein nahi — GS wala lo
-        if (r.out && !map[k].out) map[k].out = r.out;
-      }
+      const k = r.empId+'|'+r.date+'|'+r.shift;
+      if (!map[k]) map[k] = r;
+      else { if (r.out && !map[k].out) map[k].out = r.out; }
     });
     recs = Object.values(map);
     sS(SK, recs);
     doFilter(); updStats();
-    toast('✅ GS se '+gsRecs.length+' records pull ho gaye! Total: '+recs.length,'ok');
-  } catch(e) { toast('Pull error: '+e.message,'wa'); }
+    toast('✅ GS se ' + gsRecs.length + ' records pull ho gaye! Total: ' + recs.length, 'ok');
+  } catch(e) {
+    toast('❌ Pull error: ' + e.message, 'wa');
+    console.error('GS Pull error:', e);
+  }
 }
 
 // Master data GS ke "M" tab mein push karo
