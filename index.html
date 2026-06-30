@@ -939,6 +939,12 @@ function loadGSForm() {
     tabs.style.display = 'none';
     document.getElementById('pg-att').classList.add('on');
     document.getElementById('clrAllBtn').style.display = 'none';
+    // Scanner-specific clear button add karo (sirf is location ka data clear karega)
+    const scanClrBtn = document.createElement('button');
+    scanClrBtn.className = 'btn br';
+    scanClrBtn.textContent = '🗑 Is Device Ka Data Clear';
+    scanClrBtn.onclick = () => clrLocalScan();
+    document.getElementById('clrAllBtn').after(scanClrBtn);
     const bar = document.getElementById('mbar');
 
     // ── GS Connection Bar — har scanner device pe alag se URL connect karna hota hai ──
@@ -1529,6 +1535,22 @@ function clrAll(){
   recs=[];filt=[];sS(SK,recs);
   if(g('lbox'))g('lbox').className='lbox';
   renderT();updStats();renderChart();toast('Data clear','wa');
+}
+
+// Scanner mode — sirf is location/device ka data clear karo
+function clrLocalScan(){
+  const locText = LOC ? ' ("'+LOC+'" location ka)' : '';
+  if(!confirm('Is device'+locText+' ka attendance data clear karna chahte ho? Yeh sirf is browser se hatega, Google Sheet se nahi.'))return;
+  if (LOC) {
+    // Sirf is location ka data hatao
+    recs = recs.filter(r => r.loc !== LOC);
+  } else {
+    recs = [];
+  }
+  filt = [...recs];
+  sS(SK, recs);
+  renderT(); updStats(); renderChart();
+  toast('✅ Is device ka data clear ho gaya','ok');
 }
 
 // ══════════════════════════════════════
