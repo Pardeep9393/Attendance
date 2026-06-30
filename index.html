@@ -691,7 +691,11 @@ function saveGS() {
   gsSettings = {url, sheet: sheet||'Attendance', company};
   localStorage.setItem(GSK, JSON.stringify(gsSettings));
   const el=g('gs-status'); if(el) el.innerHTML='<span style="color:var(--gn)">✅ Saved! Har scan automatically Google Sheet mein jayega.</span>';
-  toast('Google Sheets settings saved!','ok');
+  toast('Google Sheets settings saved! Auto-pull bhi shuru ho gaya.','ok');
+  if (MODE === 'admin' && typeof startAutoPull === 'function') {
+    startAutoPull();
+    pullFromGS(true); // turant ek baar pull bhi karo
+  }
 }
 function testGS() {
   const url = g('gs-url') ? g('gs-url').value.trim() : (gsSettings.url||'');
@@ -817,12 +821,31 @@ async function pullFromGS(silent) {
     const gsRecs = data.records || [];
     if (!gsRecs.length) { if(!silent) toast('⚠ GS mein koi data nahi', 'wa'); return; }
 
+    // Normalize date — GS kabhi "Tue Jun 30 2026 00:00:00 GMT+0530..." bhejta hai, kabhi YYYY-MM-DD
+    function normDate(d) {
+      if (!d) return '';
+      d = String(d).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d; // already correct
+      if (/^\d{2}-\d{2}-\d{4}$/.test(d)) { const p=d.split('-'); return p[2]+'-'+p[1]+'-'+p[0]; }
+      // "Tue Jun 30 2026 00:00:00 GMT+0530..." or any parseable date string
+      try {
+        const dt = new Date(d);
+        if (!isNaN(dt.getTime())) {
+          const yyyy = dt.getFullYear();
+          const mm = String(dt.getMonth()+1).padStart(2,'0');
+          const dd = String(dt.getDate()).padStart(2,'0');
+          return yyyy+'-'+mm+'-'+dd;
+        }
+      } catch(e) {}
+      return d;
+    }
+
     // Normalize GS records
     const normalized = gsRecs.map(r => ({
       empId:    (r.empId||'').toUpperCase().trim(),
       name:     r.name     || '',
       dept:     r.dept     || '',
-      date:     r.date     || '',
+      date:     normDate(r.date),
       shift:    r.shift    || 'Night',
       loc:      r.loc      || 'Main',
       in:       r.in       || '',
