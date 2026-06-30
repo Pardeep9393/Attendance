@@ -776,7 +776,10 @@ async function syncMasterFromGS() {
 }
 
 async function sendToGS(rec) {
-  if (!gsSettings.url) return;
+  if (!gsSettings.url) {
+    if (MODE === 'scan') toast('⚠ Google Sheet connect nahi hai — upar bar se connect karo','wa');
+    return;
+  }
   try {
     const emp = mdir[rec.empId] || {};
     await fetch(gsSettings.url, {
@@ -784,7 +787,13 @@ async function sendToGS(rec) {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({action:'punch', record:rec, emp, sheet: gsSettings.sheet||'Attendance'})
     });
-  } catch(e) { console.warn('GS send failed', e); }
+    // no-cors se response read nahi ho sakta, lekin request gaya hai
+    const ind = document.getElementById('scan-gs-sent-ind');
+    if (ind) { ind.textContent = '☁ Sheet mein bhej diya — '+new Date().toLocaleTimeString('hi-IN',{hour12:false,hour:'2-digit',minute:'2-digit'}); ind.style.opacity='1'; setTimeout(()=>ind.style.opacity='0.5', 2000); }
+  } catch(e) {
+    console.warn('GS send failed', e);
+    if (MODE === 'scan') toast('❌ Sheet mein save nahi hua: '+e.message,'wa');
+  }
 }
 
 // GS Sync — UPSERT mode (data delete nahi hoga, sirf add/update hoga)
@@ -931,6 +940,65 @@ function loadGSForm() {
     document.getElementById('pg-att').classList.add('on');
     document.getElementById('clrAllBtn').style.display = 'none';
     const bar = document.getElementById('mbar');
+
+    // ── GS Connection Bar — har scanner device pe alag se URL connect karna hota hai ──
+    let gsBar = document.getElementById('scan-gs-bar');
+    if (!gsBar) {
+      gsBar = document.createElement('div');
+      gsBar.id = 'scan-gs-bar';
+      gsBar.className = 'mbar';
+      bar.before(gsBar);
+    }
+
+    function updateGSBar() {
+      if (gsSettings.url) {
+        gsBar.className = 'mbar ok';
+        gsBar.innerHTML = `✅ Google Sheet Connected — scan data live save hoga &nbsp;
+          <button class="btn bc" style="padding:1px 8px;font-size:.72rem" onclick="showScanGSPanel()">⚙ Change</button>`;
+      } else {
+        gsBar.className = 'mbar er';
+        gsBar.innerHTML = `⚠ Google Sheet Connected nahi hai — Scan data sirf is device pe save hoga, Admin tak nahi jayega!
+          <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:6px" onclick="showScanGSPanel()">🔗 Google Sheet Connect karo</button>`;
+      }
+    }
+
+    // ── GS URL Connect Panel ──
+    window.showScanGSPanel = function() {
+      const existing = document.getElementById('scan-gs-panel');
+      if (existing) { existing.remove(); return; }
+      const panel = document.createElement('div');
+      panel.id = 'scan-gs-panel';
+      panel.style.cssText = 'background:var(--c2);border:1px solid var(--cy);border-radius:10px;padding:14px 16px;margin-top:10px;';
+      panel.innerHTML = `
+        <div style="font-weight:700;color:var(--cy);margin-bottom:10px;font-size:.85rem">🔗 Google Sheet Connect — Is Device ke liye</div>
+        <div style="font-size:.76rem;color:var(--mu);margin-bottom:8px">
+          Admin se Apps Script URL lo aur yahan paste karo. Ek baar save karne ke baad is device ke sab scans seedha Google Sheet mein save honge.
+        </div>
+        <input id="scan-gs-url-inp" class="fi" style="width:100%;margin-bottom:8px;box-sizing:border-box" placeholder="https://script.google.com/macros/s/.../exec" value="${gsSettings.url||''}">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn bc" style="padding:4px 14px" onclick="saveScanGSUrl()">💾 Save & Connect</button>
+          <button class="btn ba" style="padding:4px 14px" onclick="document.getElementById('scan-gs-panel').remove()">✖ Close</button>
+        </div>
+        <div id="scan-gs-status" style="margin-top:8px;font-size:.76rem"></div>`;
+      gsBar.after(panel);
+    };
+
+    window.saveScanGSUrl = function() {
+      const inp = document.getElementById('scan-gs-url-inp');
+      const st  = document.getElementById('scan-gs-status');
+      if (!inp || !inp.value.trim()) { st.innerHTML='<span style="color:#f87">URL daalo pehle!</span>'; return; }
+      gsSettings.url = inp.value.trim();
+      gsSettings.sheet = gsSettings.sheet || 'Attendance';
+      sS(GSK, gsSettings);
+      st.innerHTML = '<span style="color:#4ade80">✅ Connected! Ab scan data is sheet mein jayega.</span>';
+      updateGSBar();
+      toast('✅ Google Sheet connect ho gaya!','ok');
+      // Master bhi GS se fetch try karo
+      if (typeof window.scannerFetchMaster === 'function') window.scannerFetchMaster();
+      setTimeout(()=>document.getElementById('scan-gs-panel')?.remove(), 1500);
+    };
+
+    updateGSBar();
 
     function updateMasterBar() {
       const count = Object.keys(mdir).length;
