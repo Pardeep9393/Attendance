@@ -196,6 +196,7 @@ tbody td{padding:7px 9px;vertical-align:middle;}
     <span class="lpill" id="lpill"></span>
     <span class="mbadge" id="mbadge"></span>
     <span id="refresh-badge" style="display:none;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:var(--gn);padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600">🔄 Auto Refresh ON</span>
+    <span id="auto-pull-ind" style="display:none;align-items:center;gap:4px;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.3);color:var(--cy);padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600" title="GS se auto pull har 15 sec">⬇ GS Live</span>
     <div id="clk">--:--:--</div>
   </div>
 </header>
@@ -798,42 +799,75 @@ async function doBulkSync() {
 }
 
 // Admin pe GS se data pull karo (scanner ka data admin pe aayega)
-async function pullFromGS() {
+async function pullFromGS(silent) {
   if (!gsSettings.url) {
-    toast('⚠ GS URL set nahi hai — Links tab → Google Sheets section mein URL daalo', 'wa');
-    // Auto switch to links tab
-    showTab('links');
-    setTimeout(() => {
-      const el = document.getElementById('gs-url');
-      if (el) { el.focus(); el.scrollIntoView({behavior:'smooth', block:'center'}); }
-    }, 300);
+    if (!silent) {
+      toast('⚠ GS URL set nahi — Links tab mein URL daalo', 'wa');
+      showTab('links');
+      setTimeout(() => { const el=document.getElementById('gs-url'); if(el){el.focus();el.scrollIntoView({behavior:'smooth',block:'center'});} }, 300);
+    }
     return;
   }
-  toast('⏳ GS se data pull ho raha hai...', 'ok');
   try {
     const url = gsSettings.url + '?action=fetch&sheet=' + encodeURIComponent(gsSettings.sheet||'Attendance') + '&t=' + Date.now();
     const res = await fetch(url, {cache:'no-store'});
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' — Apps Script redeploy karo (Anyone access)');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    if (data.status !== 'ok') throw new Error(data.message || 'API error');
+    if (data.status !== 'ok') throw new Error(data.message||'API error');
     const gsRecs = data.records || [];
-    if (!gsRecs.length) { toast('⚠ GS mein koi data nahi mila — scanners ne sync kiya?', 'wa'); return; }
-    // Merge — local + GS, deduplicate by empId+date+shift
+    if (!gsRecs.length) { if(!silent) toast('⚠ GS mein koi data nahi', 'wa'); return; }
+
+    // Normalize GS records
+    const normalized = gsRecs.map(r => ({
+      empId:    (r.empId||'').toUpperCase().trim(),
+      name:     r.name     || '',
+      dept:     r.dept     || '',
+      date:     r.date     || '',
+      shift:    r.shift    || 'Night',
+      loc:      r.loc      || 'Main',
+      in:       r.in       || '',
+      out:      r.out      || '',
+      duration: r.duration || ''
+    })).filter(r => r.empId && r.date);
+
+    // Merge — deduplicate by empId+date+shift
     const map = {};
-    recs.forEach(r => { const k = r.empId+'|'+r.date+'|'+r.shift; map[k] = r; });
-    gsRecs.forEach(r => {
+    recs.forEach(r => { const k=r.empId+'|'+r.date+'|'+r.shift; map[k]=r; });
+    normalized.forEach(r => {
       const k = r.empId+'|'+r.date+'|'+r.shift;
       if (!map[k]) map[k] = r;
-      else { if (r.out && !map[k].out) map[k].out = r.out; }
+      else {
+        if (r.out && !map[k].out) { map[k].out=r.out; map[k].duration=r.duration; }
+        if (r.name && !map[k].name) map[k].name = r.name;
+        if (r.dept && (!map[k].dept || map[k].dept==='Unknown')) map[k].dept = r.dept;
+      }
     });
     recs = Object.values(map);
     sS(SK, recs);
     doFilter(); updStats();
-    toast('✅ GS se ' + gsRecs.length + ' records pull ho gaye! Total: ' + recs.length, 'ok');
+    if (!silent) toast('✅ GS se '+normalized.length+' records pull ho gaye! Total: '+recs.length,'ok');
+    // Update last-sync time indicator
+    const ind = document.getElementById('auto-pull-ind');
+    if (ind) ind.textContent = '🔄 '+new Date().toLocaleTimeString('hi-IN',{hour12:false,hour:'2-digit',minute:'2-digit'});
   } catch(e) {
-    toast('❌ Pull error: ' + e.message, 'wa');
-    console.error('GS Pull error:', e);
+    if (!silent) toast('❌ Pull error: '+e.message+' — Apps Script redeploy karo (Anyone access)','wa');
+    console.warn('GS Pull error:', e.message);
   }
+}
+
+// Auto-pull — har 15 sec mein admin pe GS se data refresh hoga
+let autoPullTimer = null;
+function startAutoPull() {
+  if (autoPullTimer) clearInterval(autoPullTimer);
+  if (!gsSettings.url) return;
+  autoPullTimer = setInterval(() => pullFromGS(true), 15000);
+  const ind = document.getElementById('auto-pull-ind');
+  if (ind) ind.style.display = 'inline-flex';
+}
+function stopAutoPull() {
+  if (autoPullTimer) { clearInterval(autoPullTimer); autoPullTimer = null; }
+  const ind = document.getElementById('auto-pull-ind');
+  if (ind) ind.style.display = 'none';
 }
 
 // Master data GS ke "M" tab mein push karo
@@ -1143,7 +1177,7 @@ function loadGSForm() {
     loadGSForm();
     const rb = document.getElementById('refresh-badge');
     if (rb) rb.style.display = 'inline';
-    // AUTO REFRESH admin dashboard every 10 seconds
+    // AUTO REFRESH admin dashboard every 10 seconds (local data)
     setInterval(() => {
       recs = gS(SK);
       mdir = gS(MK);
@@ -1151,6 +1185,8 @@ function loadGSForm() {
       doFilter();
       updStats();
     }, 10000);
+    // AUTO PULL from GS every 15 seconds (scanner data from all devices)
+    setTimeout(() => startAutoPull(), 2000); // 2 sec baad start karo
   }
 
   if (MODE !== 'view') {
@@ -1191,9 +1227,14 @@ function fT(iso) {
   // ISO format
   try { return new Date(iso).toLocaleTimeString('hi-IN',{hour12:false,hour:'2-digit',minute:'2-digit'}); } catch(e){ return iso; }
 }
-function dur(i,o) {
+function dur(i,o,dateStr) {
   if(!i||!o) return '—';
-  const ms=new Date(o)-new Date(i);
+  // If HH:mm format, prepend date to make parseable
+  function toISO(t, d) {
+    if (/^\d{2}:\d{2}$/.test(String(t))) return (d||'2000-01-01') + 'T' + t + ':00';
+    return t;
+  }
+  const ms = new Date(toISO(o,dateStr)) - new Date(toISO(i,dateStr));
   if(ms<=0) return '—';
   return Math.floor(ms/3600000)+'h '+Math.floor((ms%3600000)/60000)+'m';
 }
@@ -1293,7 +1334,14 @@ function renderT() {
   const tb=g('atbody'); if(!tb) return;
   if(g('rcount')) g('rcount').textContent=filt.length+' records';
   if(!filt.length){tb.innerHTML='<tr><td colspan="10" class="nd">Koi record nahi</td></tr>';return;}
-  const sorted=[...filt].sort((a,b)=>new Date(b.in)-new Date(a.in));
+  // Sort: handle both ISO strings and HH:mm strings
+  function toSortKey(r) {
+    if (!r.in) return '';
+    // HH:mm format — prefix date for sort
+    if (/^\d{2}:\d{2}/.test(String(r.in))) return (r.date||'') + 'T' + r.in;
+    return r.in;
+  }
+  const sorted=[...filt].sort((a,b)=> toSortKey(b).localeCompare(toSortKey(a)));
   tb.innerHTML=sorted.map((r,i)=>
     '<tr>'+
     '<td class="tm" style="color:var(--mu)">'+(i+1)+'</td>'+
@@ -1305,9 +1353,16 @@ function renderT() {
     '<td>'+sBadge(r.shift)+'</td>'+
     '<td class="tm" style="color:var(--gn)">'+fT(r.in)+'</td>'+
     '<td class="tm" style="color:'+(r.out?'var(--rd)':'var(--mu)')+'">'+fT(r.out)+'</td>'+
-    '<td style="font-size:.76rem;color:var(--mu)">'+dur(r.in,r.out)+'</td>'+
+    '<td style="font-size:.76rem;color:var(--mu)">'+durDisp(r)+'</td>'+
     '</tr>'
   ).join('');
+}
+
+// Duration display — handle both ISO and HH:mm
+function durDisp(r) {
+  if (r.duration) return r.duration;
+  if (!r.in || !r.out) return '—';
+  return dur(r.in, r.out, r.date);
 }
 
 function updStats() {
