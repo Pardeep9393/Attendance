@@ -1,1893 +1,436 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Attendance Pro</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<title>Tracker last update dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
-:root{
-  --bg:#0F172A;--sf:#1E293B;--sf2:#273548;--bd:#334155;
-  --cy:#06B6D4;--gn:#10B981;--am:#F59E0B;--rd:#EF4444;
-  --pu:#818CF8;--pk:#F472B6;--tx:#E2E8F0;--mu:#94A3B8;--ra:12px;
-}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--tx);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
-header{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;
-  background:var(--sf);border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:200;gap:10px;flex-wrap:wrap;}
-.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:.95rem;color:var(--cy);}
-.hright{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-#clk{font-family:monospace;font-size:1rem;color:var(--cy);letter-spacing:1px;}
-.mbadge{padding:3px 11px;border-radius:20px;font-size:.73rem;font-weight:700;}
-.madmin{background:rgba(6,182,212,.15);border:1px solid var(--cy);color:var(--cy);}
-.mscan{background:rgba(16,185,129,.15);border:1px solid var(--gn);color:var(--gn);}
-.mview{background:rgba(129,140,248,.15);border:1px solid var(--pu);color:var(--pu);}
-.lpill{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:var(--am);
-  padding:3px 11px;border-radius:20px;font-size:.73rem;font-weight:700;display:none;}
-.tabs{display:flex;background:var(--sf);border-bottom:1px solid var(--bd);
-  padding:0 22px;position:sticky;top:55px;z-index:190;overflow-x:auto;}
-.tbtn{padding:11px 18px;border:none;background:none;color:var(--mu);
-  font-size:.83rem;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
-.tbtn.on{color:var(--cy);border-bottom-color:var(--cy);}
-.pg{display:none;}.pg.on{display:block;}
-.wrap{max-width:1400px;margin:0 auto;padding:18px 22px;}
-/* STATS */
-.sgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px;}
-.sc{background:var(--sf);border:1px solid var(--bd);border-radius:var(--ra);
-  padding:13px 15px;position:relative;overflow:hidden;}
-.sc::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:var(--ac,var(--cy));}
-.slb{font-size:.66rem;color:var(--mu);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;}
-.sv{font-size:1.6rem;font-weight:700;font-family:monospace;}
-.s1{--ac:var(--cy);}.s2{--ac:var(--gn);}.s3{--ac:var(--am);}
-.s4{--ac:var(--pu);}.s5{--ac:var(--rd);}.s6{--ac:var(--pk);}
-/* FILTERS */
-.fbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;
-  background:var(--sf);border:1px solid var(--bd);border-radius:var(--ra);
-  padding:13px 17px;margin-bottom:18px;}
-.fbar label{font-size:.73rem;color:var(--mu);display:flex;flex-direction:column;gap:3px;}
-.sel{background:var(--bg);border:1px solid var(--bd);border-radius:7px;
-  color:var(--tx);padding:6px 9px;font-size:.81rem;cursor:pointer;outline:none;}
-.sel:focus{border-color:var(--cy);}
-/* BUTTONS */
-.btn{padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-size:.81rem;
-  font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;transition:opacity .2s;}
-.btn:hover{opacity:.85;}
-.bc{background:var(--cy);color:#000;}.bg{background:var(--gn);color:#000;}
-.ba{background:var(--am);color:#000;}.br{background:var(--rd);color:#fff;}
-.bp{background:var(--pu);color:#fff;}.bk{background:var(--sf2);color:var(--tx);border:1px solid var(--bd);}
-.ml{margin-left:auto;}
-/* MAIN GRID */
-.mgrid{display:grid;grid-template-columns:300px 1fr;gap:16px;margin-bottom:18px;}
-/* SCAN PANEL */
-.spanel{background:var(--sf);border:1px solid var(--bd);border-radius:var(--ra);
-  padding:20px;display:flex;flex-direction:column;gap:12px;}
-.ptitle{font-size:.79rem;color:var(--mu);text-transform:uppercase;letter-spacing:1px;font-weight:700;}
-.sring{width:120px;height:120px;border-radius:50%;margin:0 auto;border:3px solid var(--bd);
-  display:flex;align-items:center;justify-content:center;transition:border-color .3s;}
-.sring.go{border-color:var(--gn);}.sring.wa{border-color:var(--am);}
-.sring.an{border-color:var(--cy);animation:pr 1s ease-in-out infinite;}
-@keyframes pr{0%,100%{box-shadow:0 0 0 0 rgba(6,182,212,.4);}50%{box-shadow:0 0 0 13px rgba(6,182,212,0);}}
-.sstatus{text-align:center;font-size:.78rem;color:var(--mu);min-height:15px;}
-.sstatus.ok{color:var(--gn);}.sstatus.wa{color:var(--am);}
-.srow{display:flex;gap:7px;}
-.fi{background:var(--bg);border:1px solid var(--bd);border-radius:7px;
-  color:var(--tx);padding:8px 11px;font-size:.88rem;outline:none;width:100%;}
-.fi:focus{border-color:var(--cy);}
-.srow .fi{flex:1;}
-.lbox{background:var(--bg);border:1px solid var(--bd);border-radius:9px;
-  padding:11px;font-size:.79rem;line-height:1.8;display:none;}
-.lbox.on{display:block;}
-.lbox .k{color:var(--mu);}
-.badge{display:inline-block;border-radius:5px;padding:2px 7px;font-size:.71rem;font-weight:700;}
-.bd2{background:rgba(245,158,11,.2);color:var(--am);}
-.bn{background:rgba(129,140,248,.2);color:var(--pu);}
-.bi{background:rgba(16,185,129,.2);color:var(--gn);}
-.bo{background:rgba(239,68,68,.2);color:var(--rd);}
-.inote{font-size:.74rem;color:var(--mu);background:rgba(6,182,212,.07);
-  border:1px solid rgba(6,182,212,.2);border-radius:7px;padding:7px 11px;line-height:1.5;}
-.mbar{font-size:.74rem;padding:7px 11px;border-radius:7px;text-align:center;display:none;}
-.mbar.ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--gn);display:block;}
-.mbar.er{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--rd);display:block;}
-/* TABLE PANEL */
-.tpanel{background:var(--sf);border:1px solid var(--bd);border-radius:var(--ra);
-  padding:16px;display:flex;flex-direction:column;gap:11px;}
-.tw{overflow-x:auto;max-height:400px;overflow-y:auto;}
-table{width:100%;border-collapse:collapse;font-size:.79rem;}
-thead th{background:var(--bg);color:var(--mu);text-align:left;padding:7px 9px;
-  font-size:.66rem;text-transform:uppercase;letter-spacing:1px;position:sticky;top:0;z-index:1;white-space:nowrap;}
-tbody tr{border-bottom:1px solid var(--bd);transition:background .15s;}
-tbody tr:hover{background:var(--sf2);}
-tbody td{padding:7px 9px;vertical-align:middle;}
-.tm{font-family:monospace;}
-.nd{text-align:center;color:var(--mu);padding:36px 0;font-size:.83rem;}
-/* CHART */
-.cpanel{background:var(--sf);border:1px solid var(--bd);border-radius:var(--ra);padding:20px;margin-bottom:18px;}
-.cpanel h2{font-size:.82rem;color:var(--mu);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;}
-.cw{position:relative;height:240px;}
-/* MASTER */
-.uzone{border:2px dashed var(--bd);border-radius:var(--ra);padding:32px 22px;
-  text-align:center;cursor:pointer;transition:all .2s;background:var(--sf);margin-bottom:16px;}
-.uzone:hover,.uzone.drag{border-color:var(--cy);background:rgba(6,182,212,.05);}
-.fbox{background:var(--sf);border:1px solid var(--bd);border-radius:var(--ra);
-  padding:14px 18px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-.fbox h3{font-size:.76rem;color:var(--mu);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px;}
-.ct{display:inline-block;background:var(--bg);border:1px solid var(--bd);
-  border-radius:4px;padding:2px 7px;font-size:.73rem;font-family:monospace;margin:2px;}
-.ct.r{border-color:var(--gn);color:var(--gn);}.ct.o{border-color:var(--mu);color:var(--mu);}
-.ppanel{background:var(--sf);border:1px solid var(--bd);border-radius:var(--ra);
-  padding:16px;margin-bottom:16px;display:none;}
-.ppanel.on{display:block;}
-.mlist{background:var(--sf);border:1px solid var(--bd);border-radius:var(--ra);padding:16px;}
-/* LINKS */
-.lgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;}
-.lcard{background:var(--sf);border:1px solid var(--bd);border-radius:var(--ra);padding:20px;}
-.lcard h3{font-size:.92rem;font-weight:700;margin-bottom:6px;}
-.lcard p{font-size:.78rem;color:var(--mu);margin-bottom:12px;line-height:1.5;}
-.lbox2{background:var(--bg);border:1px solid var(--bd);border-radius:7px;
-  padding:9px 11px;font-family:monospace;font-size:.72rem;color:var(--cy);
-  word-break:break-all;margin-bottom:7px;cursor:pointer;}
-.lbox2:hover{border-color:var(--cy);}
-.dlinks{display:flex;flex-direction:column;gap:7px;}
-.dli{background:var(--bg);border:1px solid var(--bd);border-radius:7px;
-  padding:7px 11px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
-.dli .dn{font-size:.8rem;font-weight:600;white-space:nowrap;}
-.dli .du{font-family:monospace;font-size:.69rem;color:var(--cy);flex:1;word-break:break-all;}
-/* VIEWER */
-.vhdr{background:linear-gradient(135deg,rgba(129,140,248,.15),rgba(6,182,212,.1));
-  border:1px solid rgba(129,140,248,.3);border-radius:var(--ra);padding:15px 18px;margin-bottom:18px;
-  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
-.vhdr h2{font-size:1rem;font-weight:700;color:var(--pu);}
-.dpills{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;}
-.dp{padding:5px 13px;border-radius:20px;font-size:.76rem;font-weight:600;cursor:pointer;
-  border:1px solid var(--bd);background:var(--sf);color:var(--mu);transition:all .2s;}
-.dp.on,.dp:hover{border-color:var(--pu);background:rgba(129,140,248,.15);color:var(--pu);}
-/* MODAL */
-.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center;}
-.ov.on{display:flex;}
-.modal{background:var(--sf);border:1px solid var(--bd);border-radius:13px;
-  padding:24px;max-width:420px;width:92%;max-height:80vh;overflow-y:auto;}
-.modal h3{font-size:.92rem;margin-bottom:13px;}
-.mr{display:flex;flex-direction:column;gap:4px;margin-bottom:11px;}
-.mr label{font-size:.73rem;color:var(--mu);}
-.mft{display:flex;gap:9px;margin-top:16px;justify-content:flex-end;}
-/* SYNC NOTICE */
-.sync-info{background:rgba(6,182,212,.07);border:1px solid rgba(6,182,212,.2);
-  border-radius:9px;padding:11px 14px;font-size:.77rem;color:var(--mu);line-height:1.6;margin-bottom:16px;}
-.sync-info b{color:var(--cy);}
-/* TOAST */
-#toast{position:fixed;bottom:22px;right:22px;background:var(--sf);
-  border:1px solid var(--bd);border-radius:9px;padding:11px 15px;font-size:.8rem;
-  max-width:290px;box-shadow:0 8px 28px rgba(0,0,0,.4);transform:translateY(80px);
-  opacity:0;transition:all .3s;z-index:999;display:flex;gap:7px;align-items:flex-start;}
-#toast.on{transform:translateY(0);opacity:1;}
-@media(max-width:860px){.mgrid{grid-template-columns:1fr;}.sgrid{grid-template-columns:repeat(3,1fr);}.fbox{grid-template-columns:1fr;}}
-@media(max-width:540px){.sgrid{grid-template-columns:repeat(2,1fr);}.wrap{padding:12px;}}
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    background: #f5f5f2;
+    color: #1a1a1a;
+    margin: 0;
+    padding: 24px 16px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .subtitle { font-size: 13px; color: #666; margin: 0 0 20px; }
+  .panel {
+    background: #ffffff;
+    border: 1px solid #e2e2df;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  label { font-size: 13px; color: #555; display: block; margin-bottom: 6px; }
+  textarea {
+    width: 100%;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 13px;
+    padding: 10px;
+    border: 1px solid #d5d5d0;
+    border-radius: 6px;
+    resize: vertical;
+    background: #fafaf8;
+  }
+  .btn-row { display: flex; gap: 8px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+  button {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #1a1a1a;
+  }
+  button:hover { background: #f0f0ee; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  button.primary:hover { background: #333; }
+  .progress { font-size: 13px; color: #888; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px; border-bottom: 1.5px solid #ddd; color: #555; font-weight: 600; }
+  td { padding: 10px; border-bottom: 1px solid #eee; }
+  .badge { font-size: 12px; padding: 3px 9px; border-radius: 6px; white-space: nowrap; font-weight: 500; }
+  .badge-fresh { background: #eaf3de; color: #27500a; }
+  .badge-warn { background: #faeeda; color: #633806; }
+  .badge-stale { background: #fcebeb; color: #501313; }
+  .err { color: #a32d2d; }
+  .empty { text-align: center; padding: 40px 16px; color: #999; font-size: 14px; }
+  .note { font-size: 12px; color: #999; margin-top: 8px; }
+  .filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filter-btn {
+    background: #f5f5f2;
+    border: 1px solid #e2e2df;
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #444;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .filter-btn .count {
+    background: #e2e2df;
+    color: #444;
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .filter-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .filter-btn.active .count { background: rgba(255,255,255,0.25); color: #fff; }
 </style>
 </head>
 <body>
-
-<!-- EMP MODAL -->
-<div class="ov" id="emod">
-  <div class="modal">
-    <h3 id="etitle">Employee Add</h3>
-    <div class="mr"><label>Employee ID *</label><input id="eid" class="fi" placeholder="E001"></div>
-    <div class="mr"><label>Name *</label><input id="ename" class="fi" placeholder="Ram Kumar"></div>
-    <div class="mr"><label>Department *</label><input id="edept" class="fi" placeholder="Production"></div>
-    <div class="mr"><label>Designation</label><input id="edesig" class="fi" placeholder="Operator"></div>
-    <div class="mr"><label>Mobile</label><input id="emob" class="fi" placeholder="9876543210"></div>
-    <div class="mft">
-      <button class="btn bk" onclick="closeEM()">Cancel</button>
-      <button class="btn bg" onclick="saveEM()">Save</button>
-    </div>
-  </div>
-</div>
-
-<div id="toast"><span id="tico" style="font-size:1rem;flex-shrink:0">✅</span><div id="tmsg"></div></div>
-
-<header>
-  <div class="logo">
-    <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
-      <rect width="28" height="28" rx="7" fill="#06B6D4" fill-opacity=".15"/>
-      <path d="M5 8h3v12H5V8zm4 0h2v12H9V8zm3 0h1v12h-1V8zm2 0h3v12h-3V8zm5 0h1v12h-1V8zm2 0h2v12h-2V8z" fill="#06B6D4"/>
-    </svg>
-    <span id="htitle">Attendance Pro</span>
-  </div>
-  <div class="hright">
-    <span class="lpill" id="lpill"></span>
-    <span class="mbadge" id="mbadge"></span>
-    <span id="refresh-badge" style="display:none;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:var(--gn);padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600">🔄 Auto Refresh ON</span>
-    <span id="auto-pull-ind" style="display:none;align-items:center;gap:4px;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.3);color:var(--cy);padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600" title="GS se auto pull har 15 sec">⬇ GS Live</span>
-    <div id="clk">--:--:--</div>
-  </div>
-</header>
-
-<div class="tabs" id="tabs">
-  <button class="tbtn on" onclick="showTab('att',this)">Attendance</button>
-  <button class="tbtn" onclick="showTab('master',this)">Master Data</button>
-  <button class="tbtn" onclick="showTab('links',this)">Links / Share</button>
-</div>
-
-<!-- ═══ ATTENDANCE TAB ═══ -->
-<div id="pg-att" class="pg on">
 <div class="wrap">
-  <div class="sgrid">
-    <div class="sc s1"><div class="slb">Total Punches</div><div class="sv" id="s-tot">0</div></div>
-    <div class="sc s2"><div class="slb">Aaj Unique</div><div class="sv" id="s-tod">0</div></div>
-    <div class="sc s3"><div class="slb">Day Shift ☀</div><div class="sv" id="s-day">0</div></div>
-    <div class="sc s4"><div class="slb">Night Shift 🌙</div><div class="sv" id="s-ngt">0</div></div>
-    <div class="sc s5"><div class="slb">Punch IN</div><div class="sv" id="s-in">0</div></div>
-    <div class="sc s6"><div class="slb">Punch OUT</div><div class="sv" id="s-out">0</div></div>
-  </div>
-  <div class="fbar">
-    <label>Location<select id="floc" class="sel"><option value="">Sab Locations</option></select></label>
-    <label>Department<select id="fd" class="sel"><option value="">Sab</option></select></label>
-    <label>Date<input type="date" id="fdate" class="sel"></label>
-    <label>Shift<select id="fsh" class="sel"><option value="">Dono</option><option value="Day">Day ☀</option><option value="Night">Night 🌙</option></select></label>
-    <label>Punch<select id="fpt" class="sel"><option value="">Sab</option><option value="IN">Punch IN</option><option value="OUT">Punch OUT</option></select></label>
-    <button class="btn bc" onclick="doFilter()">Filter</button>
-    <button class="btn bk" onclick="clearFilt()">Clear</button>
-    <button class="btn bg ml" onclick="dlCSV()">⬇ CSV</button>
-    <button class="btn bp" onclick="doBulkSync()" title="Local data GS mein push karo">📊 GS Sync</button>
-    <button class="btn bc" onclick="pullFromGS()" title="Scanner + sab devices ka data GS se Admin pe lao">⬇ GS Pull</button>
-    <button class="btn br" id="clrAllBtn" onclick="clrAll()">🗑 Clear All</button>
-  </div>
-  <div class="mgrid">
-    <div class="spanel">
-      <div class="ptitle">Card Scan</div>
-      <div class="sring" id="sring"><span id="sico" style="font-size:2.3rem">🪪</span></div>
-      <div class="sstatus" id="sstat">Card ID scan karein ya type karein</div>
-      <div class="srow">
-        <input id="sinp" class="fi" placeholder="Employee ID..." autofocus onkeydown="if(event.key==='Enter')doScan()">
-        <button class="btn bc" onclick="doScan()">Scan</button>
-      </div>
-      <div>
-        <label style="font-size:.73rem;color:var(--mu);display:block;margin-bottom:3px">Department (naye ke liye)</label>
-        <select id="dsel" class="fi sel" style="padding:7px"></select>
-      </div>
-      <div>
-        <label style="font-size:.73rem;color:var(--mu);display:block;margin-bottom:3px">Name (naye ke liye)</label>
-        <input id="enm" class="fi" placeholder="Employee name...">
-      </div>
-      <div class="lbox" id="lbox"></div>
-      <div class="inote">
-        1st scan = <b style="color:var(--gn)">Punch IN</b> &nbsp;|&nbsp; 2nd scan = <b style="color:var(--rd)">Punch OUT</b><br>
-        Day: 7:30AM–7:30PM &nbsp;|&nbsp; Night: 7:30PM–7:30AM
-      </div>
-      <div class="mbar" id="mbar"></div>
-      <button class="btn ba" id="syncbtn" style="display:none;width:100%" onclick="doManualSync()">🔄 Master Data Manually Sync Karo</button>
-    </div>
-    <div class="tpanel">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px">
-        <div class="ptitle">Attendance Records</div>
-        <span style="font-size:.75rem;color:var(--mu)" id="rcount"></span>
-      </div>
-      <div class="tw">
-        <table>
-          <thead><tr>
-            <th>#</th><th>Emp ID</th><th>Name</th><th>Department</th>
-            <th>Location</th><th>Date</th><th>Shift</th><th>Punch IN ✅</th><th>Punch OUT 🔴</th><th>Duration</th>
-          </tr></thead>
-          <tbody id="atbody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-  <div class="cpanel">
-    <h2>Department-wise Chart</h2>
-    <div class="cw"><canvas id="dchart"></canvas></div>
-  </div>
-</div>
-</div>
+  <h1>Tracker last update dashboard</h1>
+  <p class="subtitle">Live status of every client's Packing Material tracker, fetched directly from Google Sheets</p>
 
-<!-- ═══ MASTER TAB ═══ -->
-<div id="pg-master" class="pg">
-<div class="wrap">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px">
-    <div>
-      <h2 style="font-size:1rem;font-weight:700">Employee Master Data</h2>
-      <p style="font-size:.78rem;color:var(--mu);margin-top:3px">CSV upload karo — scan pe name/dept auto fill hoga. Master data sab locations pe sync rahega.</p>
+  <div class="panel">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+      <label style="margin-bottom: 0;">Sheet list — Client Name, link or ID (one per line)</label>
+      <button id="editBtn" onclick="toggleEdit()">Edit list</button>
     </div>
-    <div style="display:flex;gap:7px;flex-wrap:wrap">
-      <button class="btn ba" onclick="dlTpl()">📄 Sample CSV</button>
-      <button class="btn bc" onclick="syncMasterFromGS()" title="Google Sheet ke M tab se Master Data fetch karo">📊 GS→Local Sync</button>
-      <button class="btn bp" onclick="syncMasterToGS()" title="Local Master Data ko Google Sheet ke M tab mein push karo">☁ Local→GS Push</button>
-      <button class="btn bg" onclick="dlMaster()">⬇ Export</button>
-      <button class="btn br" onclick="clrMaster()">🗑 Clear</button>
+    <textarea id="input" rows="6" style="display: none;" placeholder="Welspun, 1E9EHvu7Mli_YuronH0lJfym0o0vD-xo-98Z9mIx9C0M
+Pilgrim, https://docs.google.com/spreadsheets/d/1ZcxxO5Eq4lcDNrFeQCfy-fn4BLY9UW5O93cU0MGwMeY/edit"></textarea>
+    <div id="editControls" style="display: none; gap: 8px; margin-top: 10px;">
+      <button class="primary" onclick="saveList()">Save list</button>
+    </div>
+    <div class="btn-row">
+      <button class="primary" id="checkBtn" onclick="checkAll()">Check all sheets</button>
+      <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #555; margin: 0;">
+        <input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
+        Auto-refresh every
+      </label>
+      <select id="refreshInterval" onchange="toggleAutoRefresh()" style="font-size: 13px; padding: 4px 6px; border-radius: 6px; border: 1px solid #ccc;">
+        <option value="60000">1 min</option>
+        <option value="300000" selected>5 min</option>
+        <option value="900000">15 min</option>
+        <option value="1800000">30 min</option>
+      </select>
+      <span class="progress" id="progress"></span>
+    </div>
+    <p class="note">List is saved in this browser only. Open this file in the same browser next time to see it again. Auto-refresh only runs while this tab stays open.</p>
+    <p class="note" id="lastRefreshed"></p>
+  </div>
+
+  <div class="panel" id="tableWrap" style="display: none;">
+    <div class="filter-row" id="filterRow">
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All <span class="count" id="cntAll">0</span></button>
+      <button class="filter-btn" data-filter="fresh" onclick="setFilter('fresh')">≤7 days <span class="count" id="cntFresh">0</span></button>
+      <button class="filter-btn" data-filter="warn" onclick="setFilter('warn')">8-14 days <span class="count" id="cntWarn">0</span></button>
+      <button class="filter-btn" data-filter="stale" onclick="setFilter('stale')">15+ days <span class="count" id="cntStale">0</span></button>
+      <button class="filter-btn" data-filter="error" onclick="setFilter('error')">Errors <span class="count" id="cntError">0</span></button>
+    </div>
+    <div style="overflow-x: auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Client name</th>
+          <th>Second-last column date</th>
+          <th>Last column date</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
     </div>
   </div>
 
-  <div class="sync-info">
-    <b>Auto Sync:</b> Har scan pe data automatically Google Sheets mein jata hai (agar GS URL set hai).<br>
-    <b>📊 GS→Local Sync:</b> Google Sheet ke "M" tab se master data is device pe download karo (dusri device pe use karo).<br>
-    <b>☁ Local→GS Push:</b> Is device ka master data Google Sheet ke "M" tab mein push karo.<br>
-    <b>Alag device?</b> Admin se Apps Script URL lo → Viewer ke banner mein paste karo → data seedha GS se load hoga.
-  </div>
-
-  <div class="fbox">
-    <div>
-      <h3>Required Columns</h3>
-      <span class="ct r">EmployeeID</span><span class="ct r">Name</span><span class="ct r">Department</span>
-      <span class="ct o">Designation</span><span class="ct o">Mobile</span>
-      <p style="font-size:.72rem;color:var(--mu);margin-top:7px">Green = Zaroori &nbsp;|&nbsp; Gray = Optional &nbsp;|&nbsp; Headers case-insensitive</p>
-    </div>
-    <div>
-      <h3>Tips</h3>
-      <ul style="font-size:.76rem;color:var(--mu);line-height:1.9;padding-left:15px">
-        <li>.csv format use karein (Excel → Save As → CSV)</li>
-        <li>Pehli row headers honi chahiye</li>
-        <li>Duplicate ID update ho jaata hai</li>
-        <li>Import ke baad scanner links regenerate karo</li>
-      </ul>
-    </div>
-  </div>
-  <div class="uzone" id="uzone"
-    onclick="document.getElementById('mfile').click()"
-    ondragover="event.preventDefault();this.classList.add('drag')"
-    ondragleave="this.classList.remove('drag')"
-    ondrop="onDrop(event)">
-    <div style="font-size:2rem;margin-bottom:9px">📂</div>
-    <div style="font-size:.92rem;font-weight:600;margin-bottom:4px">CSV file yahan drop karein ya click karein</div>
-    <div style="font-size:.76rem;color:var(--mu)">.csv format — Excel ko CSV mein save karke upload karein</div>
-  </div>
-  <input type="file" id="mfile" accept=".csv" style="display:none" onchange="onFile(event)">
-  <div class="ppanel" id="ppanel">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:7px">
-      <div>
-        <div style="font-size:.88rem;font-weight:700" id="ptitle">Preview</div>
-        <div style="font-size:.75rem;color:var(--mu);margin-top:2px" id="psub"></div>
-      </div>
-      <div style="display:flex;gap:7px;align-items:center">
-        <span id="perr" style="font-size:.76rem;color:var(--rd)"></span>
-        <button class="btn bg" onclick="confirmUp()">✅ Import Confirm</button>
-        <button class="btn bk" onclick="cancelUp()">Cancel</button>
-      </div>
-    </div>
-    <div class="tw" style="max-height:260px">
-      <table><thead id="phead"></thead><tbody id="pbody"></tbody></table>
-    </div>
-  </div>
-  <div class="mlist">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:7px">
-      <div style="font-size:.83rem;font-weight:700">Master Records (<span id="mcnt">0</span>)</div>
-      <div style="display:flex;gap:7px;align-items:center">
-        <input class="fi sel" id="msrch" style="width:190px;padding:6px 10px" placeholder="Search..." oninput="renderM()">
-        <button class="btn bp" onclick="openAddM()">+ Add</button>
-      </div>
-    </div>
-    <div class="tw" style="max-height:360px">
-      <table>
-        <thead><tr><th>#</th><th>Emp ID</th><th>Name</th><th>Department</th><th>Designation</th><th>Mobile</th><th>Action</th></tr></thead>
-        <tbody id="mtbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-</div>
-
-<!-- ═══ LINKS TAB ═══ -->
-<div id="pg-links" class="pg">
-<div class="wrap">
-  <div style="margin-bottom:18px">
-    <h2 style="font-size:1rem;font-weight:700;margin-bottom:5px">Share Links</h2>
-    <p style="font-size:.78rem;color:var(--mu);line-height:1.6">
-      Scanner links — location name embed hoga. Viewer links — department managers ko do for read-only dashboard.
-    </p>
-  </div>
-  <div class="lgrid">
-    <div class="lcard">
-      <h3>🔲 Scanner Links</h3>
-      <p>Har location ke liye alag scanner link. Sirf location name URL mein hoga — koi data nahi.</p>
-      <div style="margin-bottom:11px">
-        <label style="font-size:.73rem;color:var(--mu);display:block;margin-bottom:4px">Location Name</label>
-        <div style="display:flex;gap:7px">
-          <input id="linp" class="fi" placeholder="Gate-A, Canteen..." style="flex:1">
-          <button class="btn bc" onclick="genScan()">Generate</button>
-        </div>
-      </div>
-      <div id="scan-links" class="dlinks"></div>
-      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bd)">
-        <div style="font-size:.76rem;color:var(--mu);margin-bottom:7px;font-weight:600">Manual Sync (alag device ke liye):</div>
-        <p style="font-size:.73rem;color:var(--mu);margin-bottom:7px;line-height:1.5">
-          Scanner device pe master data nahi hai? Admin se yeh CSV download karke scanner pe import karo.
-        </p>
-        <button class="btn ba" onclick="dlMaster()">📥 Master Data CSV Export</button>
-      </div>
-    </div>
-    <div class="lcard">
-      <h3>👁 Viewer Links (Read-Only)</h3>
-      <p>Department managers ko do — full dashboard dikhega with filters. Scan/delete nahi kar sakte.</p>
-      <button class="btn bp" onclick="genView()" style="margin-bottom:11px">🔄 Links Refresh</button>
-      <div style="font-size:.73rem;color:var(--mu);margin-bottom:5px">All departments viewer:</div>
-      <div id="alvlink-wrap" style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:4px">
-        <a id="alvlink" href="#" target="_blank" style="font-size:.74rem;color:var(--cy);word-break:break-all;flex:1">— Generate karo —</a>
-        <button class="btn bc" style="padding:2px 9px;font-size:.71rem" onclick="cpTxt(document.getElementById('alvlink').href)">Copy</button>
-      </div>
-      <div style="font-size:.76rem;color:var(--mu);margin-bottom:7px;font-weight:600;margin-top:11px">Department-wise links:</div>
-      <div class="dlinks" id="view-links"></div>
-    </div>
-    <div class="lcard" style="grid-column:1/-1">
-      <h3>📖 Kaise Use Karein</h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:10px">
-        <div style="background:var(--bg);border-radius:9px;padding:13px">
-          <div style="font-size:.8rem;font-weight:700;color:var(--gn);margin-bottom:5px">1. Admin (Aap)</div>
-          <div style="font-size:.75rem;color:var(--mu);line-height:1.6">Master Data upload karo → Scanner links generate karo → Share karo</div>
-        </div>
-        <div style="background:var(--bg);border-radius:9px;padding:13px">
-          <div style="font-size:.8rem;font-weight:700;color:var(--cy);margin-bottom:5px">2. Scanner Device</div>
-          <div style="font-size:.75rem;color:var(--mu);line-height:1.6">Same browser = Auto sync. Alag device = Admin se Master CSV lo, Scanner pe import karo</div>
-        </div>
-        <div style="background:var(--bg);border-radius:9px;padding:13px">
-          <div style="font-size:.8rem;font-weight:700;color:var(--pu);margin-bottom:5px">3. Viewer</div>
-          <div style="font-size:.75rem;color:var(--mu);line-height:1.6">Viewer link se full dashboard — date, shift, dept filter — sirf read-only</div>
-        </div>
-        <div style="background:var(--bg);border-radius:9px;padding:13px">
-          <div style="font-size:.8rem;font-weight:700;color:var(--am);margin-bottom:5px">4. Data Combine</div>
-          <div style="font-size:.75rem;color:var(--mu);line-height:1.6">Ek hi device pe sab tabs kholo = auto combine. Alag device = CSV export → Admin pe import</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- GOOGLE SHEETS SETTINGS CARD -->
-  <div class="lcard" style="grid-column:1/-1;margin-top:4px">
-    <h3>📊 Google Sheets Integration</h3>
-    <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:9px;padding:12px 15px;font-size:.76rem;color:var(--mu);line-height:1.8;margin-bottom:14px">
-      <b style="color:var(--am)">Setup (5 min):</b>
-      1. Google Sheet banao → Extensions → Apps Script<br>
-      2. <a href="#" onclick="showGSCodeModal();return false;" style="color:var(--cy)">Yahan se code copy karo</a> → paste karo → Deploy → New Deployment → Web App → <b style="color:var(--tx)">Anyone</b> access → Deploy<br>
-      3. URL copy karke neeche paste karo → Save karo — ab har scan automatically sheet mein save hoga ✅
-    </div>
-    <div style="display:grid;grid-template-columns:1fr auto;gap:9px;align-items:end;margin-bottom:11px">
-      <div>
-        <label style="font-size:.73rem;color:var(--mu);display:block;margin-bottom:4px">Apps Script Web App URL</label>
-        <input id="gs-url" class="fi" placeholder="https://script.google.com/macros/s/AKfy.../exec" style="width:100%">
-      </div>
-      <div style="display:flex;flex-direction:column;gap:5px">
-        <button class="btn bc" onclick="saveGS()">💾 Save</button>
-        <button class="btn bk" style="font-size:.72rem" onclick="testGS()">Test</button>
-      </div>
-    </div>
-    <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
-      <div style="flex:1;min-width:140px">
-        <label style="font-size:.73rem;color:var(--mu);display:block;margin-bottom:4px">Sheet Name</label>
-        <input id="gs-sheet" class="fi" value="Attendance" placeholder="Attendance">
-      </div>
-      <div style="flex:1;min-width:140px">
-        <label style="font-size:.73rem;color:var(--mu);display:block;margin-bottom:4px">Company Name</label>
-        <input id="gs-company" class="fi" placeholder="My Company">
-      </div>
-    </div>
-    <div id="gs-status" style="margin-top:10px;font-size:.76rem;color:var(--mu)"></div>
-  </div>
-</div>
-</div>
-</div>
-
-<!-- GS CODE MODAL -->
-<div class="ov" id="gsmod">
-  <div class="modal" style="max-width:560px">
-    <h3 style="color:var(--cy)">📋 Google Apps Script Code</h3>
-    <div style="font-size:.74rem;color:var(--mu);margin-bottom:9px;line-height:1.6">Ye code Google Apps Script mein paste karo → Deploy as Web App (Anyone access) → URL copy karo</div>
-    <div style="background:var(--bg);border:1px solid var(--bd);border-radius:7px;padding:11px;font-size:.7rem;font-family:monospace;line-height:1.6;overflow-x:auto;white-space:pre;max-height:320px;overflow-y:auto" id="gs-code-box"></div>
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn bc" onclick="copyGSCode()">📋 Code Copy</button>
-      <button class="btn bk" onclick="g('gsmod').classList.remove('on')">Close</button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ VIEWER MODE ═══ -->
-<div id="vmode" style="display:none">
-<div class="wrap">
-  <!-- GS URL setup banner for viewer — shown only if not configured -->
-  <div id="vgs-setup" style="display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:13px 16px;margin-bottom:14px;font-size:.8rem;color:var(--tx)">
-    <b style="color:var(--am)">⚠ Google Sheets URL set nahi hai</b> — Admin se URL lo aur yahan paste karo taaki live data fetch ho:
-    <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap">
-      <input id="vgs-url-inp" class="fi" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;min-width:200px">
-      <input id="vgs-sheet-inp" class="fi" placeholder="Sheet name (Attendance)" style="width:140px">
-      <button class="btn bc" onclick="saveVGS()">💾 Save & Load</button>
-    </div>
-  </div>
-  <div class="vhdr">
-    <div>
-      <h2 id="vtitle">Attendance Viewer</h2>
-      <p id="vsub" style="font-size:.78rem;color:var(--mu);margin-top:3px">Read-only dashboard</p>
-    </div>
-    <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
-      <label style="font-size:.73rem;color:var(--mu)">Date<br><input type="date" id="vdate" class="fi" style="margin-top:3px" onchange="renderV()"></label>
-      <label style="font-size:.73rem;color:var(--mu)">Shift<br><select id="vsh" class="sel fi" style="margin-top:3px;padding:7px" onchange="renderV()"><option value="">Dono</option><option value="Day">Day ☀</option><option value="Night">Night 🌙</option></select></label>
-      <label style="font-size:.73rem;color:var(--mu)">Location<br><select id="vloc" class="sel fi" style="margin-top:3px;padding:7px" onchange="renderV()"><option value="">Sab Locations</option></select></label>
-      <button class="btn bg" onclick="dlV()">⬇ CSV Export</button>
-    </div>
-  </div>
-  <!-- Viewer stats -->
-  <div class="sgrid" id="vstats" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))"></div>
-  <!-- Dept pills -->
-  <div class="dpills" id="vpills"></div>
-  <!-- Chart -->
-  <div class="cpanel" id="vcpanel">
-    <h2>Department-wise Chart</h2>
-    <div class="cw"><canvas id="vchart"></canvas></div>
-  </div>
-  <!-- Table -->
-  <div class="tpanel">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px">
-      <div class="ptitle">Records</div>
-      <span style="font-size:.75rem;color:var(--mu)" id="vrcount"></span>
-    </div>
-    <div class="tw">
-      <table>
-        <thead><tr>
-          <th>#</th><th>Emp ID</th><th>Name</th><th>Department</th>
-          <th>Location</th><th>Date</th><th>Shift</th><th>Punch IN ✅</th><th>Punch OUT 🔴</th><th>Duration</th>
-        </tr></thead>
-        <tbody id="vtbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
+  <div class="empty" id="empty">No sheet list saved yet. Click edit list to add your sheets.</div>
 </div>
 
 <script>
-// ══════════════════════════════════════
-// STORAGE — same keys everywhere
-// ══════════════════════════════════════
-const SK='att_v5', MK='mast_v5', GSK='gs_settings_v1';
-const gS = k => { try{return JSON.parse(localStorage.getItem(k))||(k===MK?{}:[]);}catch{return k===MK?{}:[];} };
-const sS = (k,v) => { try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} };
+var STORAGE_KEY = 'tracker_dashboard_sheet_list';
 
-let recs = gS(SK);
-let mdir = gS(MK);
-let filt = [];
-let pdata = [];
-let dch = null, vch = null;
-let editId = null;
-let vdept = '';
+var DEFAULT_LIST = [
+  'ure&care,1E9EHvu7Mli_YuronH0lJfym0o0vD-xo-98Z9mIx9C0M',
+  'Pilgrim,1ZcxxO5Eq4lcDNrFeQCfy-fn4BLY9UW5O93cU0MGwMeY',
+  'AceFour,1uUg5ZT1aRUgzC-xSMhKTbeBc7YOd7IgjM_W2DOU0gHQ',
+  'H&H,1EJaVPfoOhnPYDH8hK0I7Vp96cnUjZT7RGSpUDnt_Uyk',
+  'Hervolab,166y-O04pbLBMtVFRhqtbLnv3Jmg2thTsPpz46CdCuHU',
+  'KRIEYA BEAUTIY,1YOZFXazT-SvBuZes3c8BUEnK4xLzT_-yxtHnPUxF5Tg',
+  'ASAI,1iNNO6T-2NOTEEtX6cSk0eINAFf-5uRiVBWpai6nyeDc',
+  'RakFitnes,1vM7v8CZJ79W3e-5BY1jY6T2X6iU44bpBXtT-RN27hIk',
+  'TSS,1kx1Nn4c1auSwTVFSe4aEI_npeoCU7CbEI01IG6fPLfs',
+  'UNBOTTLE(TUCO),1fV4F6fRvC_N8bROB6SDe30posJODIHnSlDwo7OZmdck',
+  'BrightRoots,1uzfxLXOGevBN-fGcnMuuCxP5bHZ6jrqR4QRtDfAXNfo',
+  'Dot&Key,1sWrnl5_Eg7pX-NzE77EOkkeqN0WArXI-dVRy65bXCZg',
+  'Pilgrim PHD,1r-RRKUimUBWsHStH9FX17Z-huhrtqj29lnHA_oc3c3s',
+  'Nutrova,17I7peHNZKCkwg24rp43nYhOirNeXU6ZZfuXE4uLL-Q8'
+].join('\n');
 
-// GS Settings
-let gsSettings = {};
-try { gsSettings = JSON.parse(localStorage.getItem(GSK)) || {}; } catch(e) { gsSettings = {}; }
-// Default GS URL — apna Apps Script URL yahan daalo (ya Links tab mein save karo)
-if (!gsSettings.url) { gsSettings.url = ''; gsSettings.sheet = gsSettings.sheet || 'Attendance'; }
-
-// ══════════════════════════════════════
-// URL PARAMS
-// ══════════════════════════════════════
-const UP   = new URLSearchParams(location.search);
-const MODE = UP.get('mode') || 'admin';
-const LOC  = UP.get('loc')  || '';
-const DEPT = UP.get('dept') || '';
-
-// ══════════════════════════════════════
-// GOOGLE SHEETS
-// ══════════════════════════════════════
-const GS_CODE = `function doPost(e) {
-  try {
-    var data = JSON.parse(e.postData.contents);
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheetName = data.sheet || 'Attendance';
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet) { sheet = ss.insertSheet(sheetName); }
-
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['Emp ID','Name','Department','Designation','Mobile','Date','Shift','Location','Punch IN','Punch OUT','Duration','Saved At']);
-      sheet.getRange(1,1,1,12).setFontWeight('bold').setBackground('#06B6D4').setFontColor('#000');
-    }
-
-    function fT(iso) {
-      if (!iso) return '';
-      return Utilities.formatDate(new Date(iso), Session.getScriptTimeZone(), 'HH:mm');
-    }
-    function dur(i, o) {
-      if (!i || !o) return '';
-      var ms = new Date(o) - new Date(i);
-      if (ms <= 0) return '';
-      return Math.floor(ms/3600000)+'h '+Math.floor((ms%3600000)/60000)+'m';
-    }
-
-    if (data.action === 'punch') {
-      var r = data.record;
-      // Find existing row for this emp+date+shift
-      var lastRow = sheet.getLastRow();
-      var found = -1;
-      if (lastRow > 1) {
-        var ids = sheet.getRange(2, 1, lastRow-1, 1).getValues();
-        var dates = sheet.getRange(2, 6, lastRow-1, 1).getValues();
-        var shifts = sheet.getRange(2, 7, lastRow-1, 1).getValues();
-        for (var i = 0; i < ids.length; i++) {
-          if (ids[i][0] == r.empId && dates[i][0] == r.date && shifts[i][0] == r.shift) { found = i+2; break; }
-        }
-      }
-      var emp = data.emp || {};
-      if (found === -1) {
-        sheet.appendRow([r.empId, r.name, r.dept, emp.designation||'', emp.mobile||'', r.date, r.shift, r.loc||'Main', fT(r.in), fT(r.out), dur(r.in,r.out), new Date().toLocaleString()]);
-      } else {
-        sheet.getRange(found, 9).setValue(fT(r.in));
-        sheet.getRange(found, 10).setValue(fT(r.out));
-        sheet.getRange(found, 11).setValue(dur(r.in,r.out));
-        sheet.getRange(found, 12).setValue(new Date().toLocaleString());
-      }
-    }
-
-    if (data.action === 'bulkSync') {
-      // Clear old data and re-write all
-      var lastRow2 = sheet.getLastRow();
-      if (lastRow2 > 1) sheet.deleteRows(2, lastRow2-1);
-      data.records.forEach(function(r) {
-        var emp2 = data.mdir ? (data.mdir[r.empId] || {}) : {};
-        sheet.appendRow([r.empId, r.name, r.dept, emp2.designation||'', emp2.mobile||'', r.date, r.shift, r.loc||'Main', fT(r.in), fT(r.out), dur(r.in,r.out), new Date().toLocaleString()]);
-      });
-    }
-
-    return ContentService.createTextOutput(JSON.stringify({status:'ok',rows:sheet.getLastRow()})).setMimeType(ContentService.MimeType.JSON);
-  } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({status:'error',message:err.toString()})).setMimeType(ContentService.MimeType.JSON);
-  }
+function extractSheetId(raw) {
+  var m = raw.match(/[-\w]{25,}/);
+  return m ? m[0] : raw.trim();
 }
-function doGet(e) {
-  try {
-    var params = e ? (e.parameter || {}) : {};
-    var action = params.action || '';
-    var callback = params.callback || '';
-    if (action === 'fetch') {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      var sheetName = params.sheet || 'Attendance';
-      var sheet = ss.getSheetByName(sheetName);
-      var result;
-      if (!sheet || sheet.getLastRow() < 2) {
-        result = {status:'ok',records:[]};
-      } else {
-        var lastRow = sheet.getLastRow();
-        var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
-        var records = data.map(function(row) {
-          if (!row[0]) return null;
-          return {
-            empId: String(row[0]),
-            name: String(row[1]),
-            dept: String(row[2]),
-            designation: String(row[3]),
-            mobile: String(row[4]),
-            date: String(row[5]),
-            shift: String(row[6]),
-            loc: String(row[7]) || 'Main',
-            in: row[8] ? String(row[8]) : '',
-            out: row[9] ? String(row[9]) : '',
-            duration: String(row[10])
-          };
-        }).filter(Boolean);
-        result = {status:'ok',records:records};
-      }
-      var jsonStr = JSON.stringify(result);
-      // JSONP support — wrap in callback if provided
-      if (callback) {
-        return ContentService.createTextOutput(callback + '(' + jsonStr + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
-      }
-      return ContentService.createTextOutput(jsonStr).setMimeType(ContentService.MimeType.JSON);
-    }
-    var msg = JSON.stringify({status:'ok',message:'Attendance Pro API Ready'});
-    if (callback) return ContentService.createTextOutput(callback + '(' + msg + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
-    return ContentService.createTextOutput(msg).setMimeType(ContentService.MimeType.JSON);
-  } catch(err) {
-    var errMsg = JSON.stringify({status:'error',message:err.toString()});
-    if (params && params.callback) return ContentService.createTextOutput(params.callback + '(' + errMsg + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
-    return ContentService.createTextOutput(errMsg).setMimeType(ContentService.MimeType.JSON);
-  }
-}`;
 
-function showGSCodeModal() {
-  g('gs-code-box').textContent = GS_CODE;
-  g('gsmod').classList.add('on');
+function parseDate(str) {
+  var m = str.trim().match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+  if (!m) return null;
+  var d = parseInt(m[1], 10), mo = parseInt(m[2], 10) - 1, y = parseInt(m[3], 10);
+  var dt = new Date(y, mo, d);
+  if (isNaN(dt.getTime())) return null;
+  return dt;
 }
-function copyGSCode() {
-  navigator.clipboard.writeText(GS_CODE).then(() => toast('Code copy ho gaya! Apps Script mein paste karo.','ok')).catch(()=>{
-    const ta=document.createElement('textarea');ta.value=GS_CODE;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('Code copied!','ok');
+
+function daysSince(dt) {
+  var now = new Date();
+  now.setHours(0,0,0,0);
+  var target = new Date(dt);
+  target.setHours(0,0,0,0);
+  return Math.round((now - target) / 86400000);
+}
+
+function fmtDate(dt) {
+  var dd = String(dt.getDate()).padStart(2, '0');
+  var mm = String(dt.getMonth() + 1).padStart(2, '0');
+  return dd + '-' + mm + '-' + dt.getFullYear();
+}
+
+function statusClassFor(days) {
+  if (days === null) return '';
+  if (days <= 7) return 'badge-fresh';
+  if (days <= 14) return 'badge-warn';
+  return 'badge-stale';
+}
+
+function bucketFor(days) {
+  if (days === null) return 'error';
+  if (days <= 7) return 'fresh';
+  if (days <= 14) return 'warn';
+  return 'stale';
+}
+
+var lastResults = [];
+var currentFilter = 'all';
+
+function setFilter(key) {
+  currentFilter = key;
+  document.querySelectorAll('.filter-btn').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-filter') === key);
+  });
+  renderTable();
+}
+
+function parseLines(raw) {
+  return raw.split('\n').map(function(l) { return l.trim(); }).filter(Boolean).map(function(line) {
+    var parts = line.split(',');
+    var name, ref;
+    if (parts.length >= 2) {
+      name = parts[0].trim();
+      ref = parts.slice(1).join(',').trim();
+    } else {
+      ref = parts[0].trim();
+      name = null;
+    }
+    var id = extractSheetId(ref);
+    return { name: name || id.slice(0, 8), id: id };
   });
 }
-function saveGS() {
-  const url = g('gs-url') ? g('gs-url').value.trim() : '';
-  const sheet = g('gs-sheet') ? g('gs-sheet').value.trim() : 'Attendance';
-  const company = g('gs-company') ? g('gs-company').value.trim() : '';
-  if (!url) { toast('URL daalo pehle!','wa'); return; }
-  gsSettings = {url, sheet: sheet||'Attendance', company};
-  localStorage.setItem(GSK, JSON.stringify(gsSettings));
-  const el=g('gs-status'); if(el) el.innerHTML='<span style="color:var(--gn)">✅ Saved! Har scan automatically Google Sheet mein jayega.</span>';
-  toast('Google Sheets settings saved! Auto-pull bhi shuru ho gaya.','ok');
-  if (MODE === 'admin' && typeof startAutoPull === 'function') {
-    startAutoPull();
-    pullFromGS(true); // turant ek baar pull bhi karo
+
+async function fetchSheetDates(entry) {
+  var url = 'https://docs.google.com/spreadsheets/d/' + entry.id + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent('Packing Material');
+  var res = await fetch(url);
+  if (!res.ok) throw new Error('cant reach sheet (' + res.status + ')');
+  var text = await res.text();
+  if (text.trim().startsWith('<')) throw new Error('sheet not accessible, check share link');
+  var parsed = Papa.parse(text);
+  var rows = parsed.data;
+  var dates = [];
+  for (var r = 0; r < Math.min(rows.length, 5); r++) {
+    for (var c = 0; c < rows[r].length; c++) {
+      var d = parseDate(String(rows[r][c] || ''));
+      if (d) dates.push(d);
+    }
   }
-}
-function testGS() {
-  const url = g('gs-url') ? g('gs-url').value.trim() : (gsSettings.url||'');
-  if (!url) { toast('Pehle URL daalo','wa'); return; }
-  toast('Test request bheji ja rahi hai...','ok');
-  fetch(url, {method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'test'})})
-    .then(()=>{ const el=g('gs-status'); if(el) el.innerHTML='<span style="color:var(--gn)">✅ Request bheji gayi (no-cors mode) — Apps Script execution log check karo</span>'; toast('Test request sent!','ok'); })
-    .catch(e=>{ toast('Error: '+e.message,'wa'); });
+  dates.sort(function(a, b) { return a - b; });
+  return dates;
 }
 
-// ══════════════════════════════════════
-// MASTER SYNC FROM GOOGLE SHEETS "M" TAB
-// ══════════════════════════════════════
-async function syncMasterFromGS() {
-  // Fetch Master data from Google Sheet public CSV (gid=604979772 is Attendance; M sheet gid auto-detect)
-  // We use the spreadsheet public CSV export for "M" sheet
-  const SPREADSHEET_ID = '1Po78BwBYkabon0J0RGg8dTZeN7ZYlP_Gy4dl44P_hbc';
-  // Try to find "M" sheet — user must share sheet as public
-  // We try gviz with sheet name "M"
-  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=M&t=${Date.now()}`;
-  toast('📊 Google Sheets se Master Data fetch ho raha hai...','ok');
+function renderEmpty(show) {
+  document.getElementById('empty').style.display = show ? 'block' : 'none';
+  document.getElementById('tableWrap').style.display = show ? 'none' : 'block';
+}
+
+function toggleEdit() {
+  var ta = document.getElementById('input');
+  var ctrl = document.getElementById('editControls');
+  var showing = ta.style.display !== 'none';
+  ta.style.display = showing ? 'none' : 'block';
+  ctrl.style.display = showing ? 'none' : 'flex';
+}
+
+function saveList() {
+  var raw = document.getElementById('input').value;
   try {
-    const res = await fetch(url, {cache:'no-store'});
-    if (!res.ok) throw new Error('HTTP '+res.status);
-    const csv = await res.text();
-    const lines = csv.trim().split('\n');
-    if (lines.length < 2) { toast('M sheet mein koi data nahi mila!','wa'); return; }
-    // Parse CSV
-    const sep = lines[0].indexOf('\t') >= 0 ? '\t' : ',';
-    function pl(line) {
-      if(sep==='\t') return line.split('\t').map(c=>c.trim());
-      const res=[];let cur='',inQ=false;
-      for(let i=0;i<line.length;i++){
-        const ch=line[i];
-        if(ch==='"'){inQ=!inQ;}
-        else if(ch===','&&!inQ){res.push(cur);cur='';}
-        else{cur+=ch;}
-      }
-      res.push(cur);
-      return res.map(c=>c.replace(/^"|"$/g,'').trim());
+    localStorage.setItem(STORAGE_KEY, raw);
+  } catch (e) {
+    console.error('save failed', e);
+  }
+  toggleEdit();
+  checkAll();
+}
+
+function loadSavedList() {
+  try {
+    var saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      document.getElementById('input').value = saved;
+      return saved;
     }
-    const hdrs = pl(lines[0]).map(h=>h.toLowerCase().replace(/[\s_]/g,''));
-    // Column mapping — flexible
-    const al = {
-      employeeid:['employeeid','emp_id','empid','employee_id','id','code','empcode'],
-      name:['name','employeename','emp_name','fullname','full_name'],
-      department:['department','dept','department_name'],
-      designation:['designation','desig','position','role'],
-      mobile:['mobile','phone','contact','mobileno']
-    };
-    const cm = {};
-    hdrs.forEach((h,i)=>Object.entries(al).forEach(([k,vs])=>{if(vs.includes(h))cm[k]=i;}));
-    if(cm.employeeid===undefined||cm.name===undefined||cm.department===undefined){
-      // Try positional fallback: col0=ID, col1=Name, col2=Dept
-      if(hdrs.length>=3){cm.employeeid=0;cm.name=1;cm.department=2;if(hdrs.length>3)cm.designation=3;if(hdrs.length>4)cm.mobile=4;}
-      else{toast('M sheet mein EmployeeID, Name, Department columns nahi mile!','wa');return;}
-    }
-    let added=0,updated=0;
-    for(let i=1;i<lines.length;i++){
-      if(!lines[i].trim()) continue;
-      const c=pl(lines[i]);
-      const empId=(c[cm.employeeid]||'').toUpperCase().trim();
-      const name=(c[cm.name]||'').trim();
-      const dept=(c[cm.department]||'').trim();
-      if(!empId||!name) continue;
-      const desig=cm.designation!==undefined?(c[cm.designation]||'').trim():'';
-      const mob=cm.mobile!==undefined?(c[cm.mobile]||'').trim():'';
-      if(mdir[empId])updated++;else added++;
-      mdir[empId]={name,dept,designation:desig,mobile:mob};
-    }
-    sS(MK,mdir);
-    refreshDepts();renderM();updStats();
-    toast(`✅ Master Sync done! ${added} naye + ${updated} update (${added+updated} total)`,'ok');
-  } catch(e) {
-    toast('❌ Sync failed: '+e.message+' — Sheet "M" public share check karo','wa');
-    console.error('Master GS sync error',e);
+  } catch (e) {}
+  document.getElementById('input').value = DEFAULT_LIST;
+  return DEFAULT_LIST;
+}
+
+var refreshTimer = null;
+
+function toggleAutoRefresh() {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+  var on = document.getElementById('autoRefreshToggle').checked;
+  if (on) {
+    var ms = parseInt(document.getElementById('refreshInterval').value, 10);
+    refreshTimer = setInterval(checkAll, ms);
   }
 }
 
-async function sendToGS(rec) {
-  if (!gsSettings.url) {
-    if (MODE === 'scan') toast('⚠ Google Sheet connect nahi hai — upar bar se connect karo','wa');
+function updateLastRefreshed() {
+  var now = new Date();
+  var hh = String(now.getHours()).padStart(2, '0');
+  var mm = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('lastRefreshed').innerText = 'Last refreshed at ' + hh + ':' + mm;
+}
+
+async function checkAll() {
+  var raw = document.getElementById('input').value;
+  var entries = parseLines(raw);
+  var progressEl = document.getElementById('progress');
+  var btn = document.getElementById('checkBtn');
+  if (entries.length === 0) { renderEmpty(true); return; }
+  btn.disabled = true;
+
+  var results = [];
+  for (var i = 0; i < entries.length; i++) {
+    progressEl.innerText = 'checking ' + (i + 1) + ' of ' + entries.length + ' - ' + entries[i].name;
+    var entry = entries[i];
+    var result = { name: entry.name, ok: false, dates: [], error: null };
+    try {
+      var dates = await fetchSheetDates(entry);
+      if (dates.length === 0) throw new Error('no dates found in sheet');
+      result.ok = true;
+      result.dates = dates.slice(-2);
+    } catch (e) {
+      result.error = e.message || 'fetch failed';
+    }
+    results.push(result);
+  }
+  progressEl.innerText = '';
+  btn.disabled = false;
+  renderEmpty(false);
+
+  results.sort(function(a, b) {
+    var da = a.ok ? daysSince(a.dates[a.dates.length - 1]) : -1;
+    var db = b.ok ? daysSince(b.dates[b.dates.length - 1]) : -1;
+    return db - da;
+  });
+
+  lastResults = results;
+  renderTable();
+  updateLastRefreshed();
+}
+
+function renderTable() {
+  var tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+
+  var counts = { all: lastResults.length, fresh: 0, warn: 0, stale: 0, error: 0 };
+  lastResults.forEach(function(r) {
+    var key = r.ok ? bucketFor(daysSince(r.dates[r.dates.length - 1])) : 'error';
+    counts[key]++;
+  });
+  document.getElementById('cntAll').innerText = counts.all;
+  document.getElementById('cntFresh').innerText = counts.fresh;
+  document.getElementById('cntWarn').innerText = counts.warn;
+  document.getElementById('cntStale').innerText = counts.stale;
+  document.getElementById('cntError').innerText = counts.error;
+
+  var visible = lastResults.filter(function(r) {
+    if (currentFilter === 'all') return true;
+    var key = r.ok ? bucketFor(daysSince(r.dates[r.dates.length - 1])) : 'error';
+    return key === currentFilter;
+  });
+
+  if (visible.length === 0) {
+    var trEmpty = document.createElement('tr');
+    var tdEmpty = document.createElement('td');
+    tdEmpty.colSpan = 4;
+    tdEmpty.style.cssText = 'text-align: center; padding: 24px; color: #999;';
+    tdEmpty.innerText = 'No clients in this bucket.';
+    trEmpty.appendChild(tdEmpty);
+    tbody.appendChild(trEmpty);
     return;
   }
-  try {
-    const emp = mdir[rec.empId] || {};
-    await fetch(gsSettings.url, {
-      method:'POST', mode:'no-cors',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'punch', record:rec, emp, sheet: gsSettings.sheet||'Attendance'})
-    });
-    // no-cors se response read nahi ho sakta, lekin request gaya hai
-    const ind = document.getElementById('scan-gs-sent-ind');
-    if (ind) { ind.textContent = '☁ Sheet mein bhej diya — '+new Date().toLocaleTimeString('hi-IN',{hour12:false,hour:'2-digit',minute:'2-digit'}); ind.style.opacity='1'; setTimeout(()=>ind.style.opacity='0.5', 2000); }
-  } catch(e) {
-    console.warn('GS send failed', e);
-    if (MODE === 'scan') toast('❌ Sheet mein save nahi hua: '+e.message,'wa');
-  }
-}
 
-// GS Sync — UPSERT mode (data delete nahi hoga, sirf add/update hoga)
-async function doBulkSync() {
-  if (!gsSettings.url) { toast('GS URL nahi set — Links tab mein karo','wa'); return; }
-  if (!recs.length) { toast('Koi data nahi sync karne ke liye','wa'); return; }
-  toast('⏳ GS Sync ho raha hai...','ok');
-  try {
-    await fetch(gsSettings.url, {
-      method:'POST', mode:'no-cors',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'upsertSync', records:recs, mdir, sheet: gsSettings.sheet||'Attendance'})
-    });
-    toast('✅ '+recs.length+' records GS mein sync ho gaye! (purana data safe hai)','ok');
-  } catch(e) { toast('Sync error: '+e.message,'wa'); }
-}
+  visible.forEach(function(r) {
+    var tr = document.createElement('tr');
 
-// Admin pe GS se data pull karo (scanner ka data admin pe aayega)
-async function pullFromGS(silent) {
-  if (!gsSettings.url) {
-    if (!silent) {
-      toast('⚠ GS URL set nahi — Links tab mein URL daalo', 'wa');
-      showTab('links');
-      setTimeout(() => { const el=document.getElementById('gs-url'); if(el){el.focus();el.scrollIntoView({behavior:'smooth',block:'center'});} }, 300);
-    }
-    return;
-  }
-  try {
-    const url = gsSettings.url + '?action=fetch&sheet=' + encodeURIComponent(gsSettings.sheet||'Attendance') + '&t=' + Date.now();
-    const res = await fetch(url, {cache:'no-store'});
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    if (data.status !== 'ok') throw new Error(data.message||'API error');
-    const gsRecs = data.records || [];
-    if (!gsRecs.length) { if(!silent) toast('⚠ GS mein koi data nahi', 'wa'); return; }
+    var tdName = document.createElement('td');
+    tdName.style.fontWeight = '600';
+    tdName.innerText = r.name;
+    tr.appendChild(tdName);
 
-    // Normalize date — GS kabhi "Tue Jun 30 2026 00:00:00 GMT+0530..." bhejta hai, kabhi YYYY-MM-DD
-    function normDate(d) {
-      if (!d) return '';
-      d = String(d).trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d; // already correct
-      if (/^\d{2}-\d{2}-\d{4}$/.test(d)) { const p=d.split('-'); return p[2]+'-'+p[1]+'-'+p[0]; }
-      // "Tue Jun 30 2026 00:00:00 GMT+0530..." or any parseable date string
-      try {
-        const dt = new Date(d);
-        if (!isNaN(dt.getTime())) {
-          const yyyy = dt.getFullYear();
-          const mm = String(dt.getMonth()+1).padStart(2,'0');
-          const dd = String(dt.getDate()).padStart(2,'0');
-          return yyyy+'-'+mm+'-'+dd;
-        }
-      } catch(e) {}
-      return d;
+    if (!r.ok) {
+      var tdErr = document.createElement('td');
+      tdErr.colSpan = 3;
+      tdErr.className = 'err';
+      tdErr.innerText = r.error;
+      tr.appendChild(tdErr);
+      tbody.appendChild(tr);
+      return;
     }
 
-    // Normalize GS records
-    const normalized = gsRecs.map(r => ({
-      empId:    (r.empId||'').toUpperCase().trim(),
-      name:     r.name     || '',
-      dept:     r.dept     || '',
-      date:     normDate(r.date),
-      shift:    r.shift    || 'Night',
-      loc:      r.loc      || 'Main',
-      in:       r.in       || '',
-      out:      r.out      || '',
-      duration: r.duration || ''
-    })).filter(r => r.empId && r.date);
+    var last = r.dates[r.dates.length - 1];
+    var prev = r.dates.length > 1 ? r.dates[r.dates.length - 2] : null;
 
-    // Merge — deduplicate by empId+date+shift
-    const map = {};
-    recs.forEach(r => { const k=r.empId+'|'+r.date+'|'+r.shift; map[k]=r; });
-    normalized.forEach(r => {
-      const k = r.empId+'|'+r.date+'|'+r.shift;
-      if (!map[k]) map[k] = r;
-      else {
-        if (r.out && !map[k].out) { map[k].out=r.out; map[k].duration=r.duration; }
-        if (r.name && !map[k].name) map[k].name = r.name;
-        if (r.dept && (!map[k].dept || map[k].dept==='Unknown')) map[k].dept = r.dept;
-      }
-    });
-    recs = Object.values(map);
-    sS(SK, recs);
-    doFilter(); updStats();
-    if (!silent) toast('✅ GS se '+normalized.length+' records pull ho gaye! Total: '+recs.length,'ok');
-    // Update last-sync time indicator
-    const ind = document.getElementById('auto-pull-ind');
-    if (ind) ind.textContent = '🔄 '+new Date().toLocaleTimeString('hi-IN',{hour12:false,hour:'2-digit',minute:'2-digit'});
-  } catch(e) {
-    if (!silent) toast('❌ Pull error: '+e.message+' — Apps Script redeploy karo (Anyone access)','wa');
-    console.warn('GS Pull error:', e.message);
-  }
+    var tdPrev = document.createElement('td');
+    tdPrev.style.color = '#666';
+    tdPrev.innerText = prev ? fmtDate(prev) : '--';
+    tr.appendChild(tdPrev);
+
+    var tdLast = document.createElement('td');
+    tdLast.innerText = fmtDate(last);
+    tr.appendChild(tdLast);
+
+    var d = daysSince(last);
+    var tdStatus = document.createElement('td');
+    var badge = document.createElement('span');
+    badge.className = 'badge ' + statusClassFor(d);
+    badge.innerText = d + 'd ago';
+    tdStatus.appendChild(badge);
+    tr.appendChild(tdStatus);
+
+    tbody.appendChild(tr);
+  });
 }
 
-// Auto-pull — har 15 sec mein admin pe GS se data refresh hoga
-let autoPullTimer = null;
-function startAutoPull() {
-  if (autoPullTimer) clearInterval(autoPullTimer);
-  if (!gsSettings.url) return;
-  autoPullTimer = setInterval(() => pullFromGS(true), 15000);
-  const ind = document.getElementById('auto-pull-ind');
-  if (ind) ind.style.display = 'inline-flex';
-}
-function stopAutoPull() {
-  if (autoPullTimer) { clearInterval(autoPullTimer); autoPullTimer = null; }
-  const ind = document.getElementById('auto-pull-ind');
-  if (ind) ind.style.display = 'none';
-}
-
-// Master data GS ke "M" tab mein push karo
-async function syncMasterToGS() {
-  if (!gsSettings.url) { toast('GS URL nahi set','wa'); return; }
-  if (!Object.keys(mdir).length) { toast('Master data khaali hai!','wa'); return; }
-  toast('⏳ Master data GS mein save ho raha hai...','ok');
-  try {
-    await fetch(gsSettings.url, {
-      method:'POST', mode:'no-cors',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'saveMaster', employees:mdir})
-    });
-    toast('✅ '+Object.keys(mdir).length+' employees GS ke "M" tab mein save ho gaye!','ok');
-  } catch(e) { toast('Error: '+e.message,'wa'); }
-}
-
-function loadGSForm() {
-  if (g('gs-url') && gsSettings.url) g('gs-url').value = gsSettings.url;
-  if (g('gs-sheet') && gsSettings.sheet) g('gs-sheet').value = gsSettings.sheet;
-  if (g('gs-company') && gsSettings.company) g('gs-company').value = gsSettings.company;
-  if (gsSettings.url && g('gs-status')) g('gs-status').innerHTML='<span style="color:var(--gn)">✅ Google Sheets connected: '+gsSettings.sheet+'</span>';
-}
-
-// ══════════════════════════════════════
-// INIT
-// ══════════════════════════════════════
-(function init(){
-  const badge = document.getElementById('mbadge');
-  const tabs  = document.getElementById('tabs');
-  const lp    = document.getElementById('lpill');
-
-  if (MODE === 'scan') {
-    badge.className = 'mbadge mscan'; badge.textContent = '🔲 Scanner — ' + (LOC||'');
-    document.getElementById('htitle').textContent = 'Scanner' + (LOC ? ' — '+LOC : '');
-    if (LOC) { lp.style.display='inline'; lp.textContent = '📍 '+LOC; }
-    tabs.style.display = 'none';
-    document.getElementById('pg-att').classList.add('on');
-    document.getElementById('clrAllBtn').style.display = 'none';
-    // Scanner-specific clear button add karo (sirf is location ka data clear karega)
-    const scanClrBtn = document.createElement('button');
-    scanClrBtn.className = 'btn br';
-    scanClrBtn.textContent = '🗑 Is Device Ka Data Clear';
-    scanClrBtn.onclick = () => clrLocalScan();
-    document.getElementById('clrAllBtn').after(scanClrBtn);
-    const bar = document.getElementById('mbar');
-
-    // ── GS Connection Bar — har scanner device pe alag se URL connect karna hota hai ──
-    let gsBar = document.getElementById('scan-gs-bar');
-    if (!gsBar) {
-      gsBar = document.createElement('div');
-      gsBar.id = 'scan-gs-bar';
-      gsBar.className = 'mbar';
-      bar.before(gsBar);
-    }
-
-    function updateGSBar() {
-      if (gsSettings.url) {
-        gsBar.className = 'mbar ok';
-        gsBar.innerHTML = `✅ Google Sheet Connected — scan data live save hoga &nbsp;
-          <button class="btn bc" style="padding:1px 8px;font-size:.72rem" onclick="showScanGSPanel()">⚙ Change</button>`;
-      } else {
-        gsBar.className = 'mbar er';
-        gsBar.innerHTML = `⚠ Google Sheet Connected nahi hai — Scan data sirf is device pe save hoga, Admin tak nahi jayega!
-          <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:6px" onclick="showScanGSPanel()">🔗 Google Sheet Connect karo</button>`;
-      }
-    }
-
-    // ── GS URL Connect Panel ──
-    window.showScanGSPanel = function() {
-      const existing = document.getElementById('scan-gs-panel');
-      if (existing) { existing.remove(); return; }
-      const panel = document.createElement('div');
-      panel.id = 'scan-gs-panel';
-      panel.style.cssText = 'background:var(--c2);border:1px solid var(--cy);border-radius:10px;padding:14px 16px;margin-top:10px;';
-      panel.innerHTML = `
-        <div style="font-weight:700;color:var(--cy);margin-bottom:10px;font-size:.85rem">🔗 Google Sheet Connect — Is Device ke liye</div>
-        <div style="font-size:.76rem;color:var(--mu);margin-bottom:8px">
-          Admin se Apps Script URL lo aur yahan paste karo. Ek baar save karne ke baad is device ke sab scans seedha Google Sheet mein save honge.
-        </div>
-        <input id="scan-gs-url-inp" class="fi" style="width:100%;margin-bottom:8px;box-sizing:border-box" placeholder="https://script.google.com/macros/s/.../exec" value="${gsSettings.url||''}">
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn bc" style="padding:4px 14px" onclick="saveScanGSUrl()">💾 Save & Connect</button>
-          <button class="btn ba" style="padding:4px 14px" onclick="document.getElementById('scan-gs-panel').remove()">✖ Close</button>
-        </div>
-        <div id="scan-gs-status" style="margin-top:8px;font-size:.76rem"></div>`;
-      gsBar.after(panel);
-    };
-
-    window.saveScanGSUrl = function() {
-      const inp = document.getElementById('scan-gs-url-inp');
-      const st  = document.getElementById('scan-gs-status');
-      if (!inp || !inp.value.trim()) { st.innerHTML='<span style="color:#f87">URL daalo pehle!</span>'; return; }
-      gsSettings.url = inp.value.trim();
-      gsSettings.sheet = gsSettings.sheet || 'Attendance';
-      sS(GSK, gsSettings);
-      st.innerHTML = '<span style="color:#4ade80">✅ Connected! Ab scan data is sheet mein jayega.</span>';
-      updateGSBar();
-      toast('✅ Google Sheet connect ho gaya!','ok');
-      // Master bhi GS se fetch try karo
-      if (typeof window.scannerFetchMaster === 'function') window.scannerFetchMaster();
-      setTimeout(()=>document.getElementById('scan-gs-panel')?.remove(), 1500);
-    };
-
-    updateGSBar();
-
-    function updateMasterBar() {
-      const count = Object.keys(mdir).length;
-      if (count > 0) {
-        bar.className = 'mbar ok';
-        bar.innerHTML = `✅ Master ready — ${count} employees loaded &nbsp;
-          <button class="btn bc" style="padding:1px 8px;font-size:.72rem" onclick="showScanMasterPanel()">📋 Update</button>
-          <button class="btn bp" style="padding:1px 8px;font-size:.72rem" onclick="clearScanMaster()">🗑 Clear</button>`;
-      } else {
-        bar.className = 'mbar er';
-        bar.innerHTML = `⚠ Master Data nahi hai — Employee names/departments nahi dikhenge
-          <button class="btn bc" style="padding:1px 8px;font-size:.72rem;margin-left:6px" onclick="showScanMasterPanel()">📂 Master Upload karo</button>`;
-      }
-    }
-
-    // ── Master Upload Panel (CSV ya paste) ──
-    window.showScanMasterPanel = function() {
-      const existing = document.getElementById('scan-master-panel');
-      if (existing) { existing.remove(); return; }
-      const panel = document.createElement('div');
-      panel.id = 'scan-master-panel';
-      panel.style.cssText = 'background:var(--c2);border:1px solid var(--cy);border-radius:10px;padding:14px 16px;margin-top:10px;';
-      panel.innerHTML = `
-        <div style="font-weight:700;color:var(--cy);margin-bottom:10px;font-size:.85rem">📂 Master Data Upload — Scanner Device</div>
-
-        <div style="font-size:.76rem;color:var(--mu);margin-bottom:8px">
-          <b>Option 1:</b> CSV file upload karo (EmpID,Name,Department columns chahiye)
-        </div>
-        <input type="file" id="scan-csv-file" accept=".csv" style="font-size:.76rem;color:var(--ft);margin-bottom:10px;display:block"
-          onchange="loadScanCSV(this)">
-
-        <div style="font-size:.76rem;color:var(--mu);margin:10px 0 5px">
-          <b>Option 2:</b> CSV data paste karo (header row ke saath):
-        </div>
-        <textarea id="scan-csv-paste" rows="5" style="width:100%;background:var(--c3);color:var(--ft);border:1px solid var(--bd);border-radius:6px;padding:6px 8px;font-size:.72rem;font-family:monospace;box-sizing:border-box"
-          placeholder="EmpID,Name,Department,Designation,Mobile&#10;FKN-0001,Rahul Kumar,Idam Natural Wellness,...&#10;FKN-0002,Priya Sharma,Lagom Labs,..."></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-          <button class="btn bc" style="padding:4px 14px" onclick="parseScanCSV()">✅ Load karo</button>
-          <button class="btn ba" style="padding:4px 14px" onclick="document.getElementById('scan-master-panel').remove()">✖ Close</button>
-        </div>
-        <div id="scan-master-status" style="margin-top:8px;font-size:.76rem"></div>`;
-      bar.after(panel);
-    };
-
-    window.loadScanCSV = function(input) {
-      const file = input.files[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = e => {
-        document.getElementById('scan-csv-paste').value = e.target.result;
-        document.getElementById('scan-master-status').innerHTML = '<span style="color:var(--cy)">File loaded — "Load karo" dabao</span>';
-      };
-      reader.readAsText(file);
-    };
-
-    window.parseScanCSV = function() {
-      const raw = (document.getElementById('scan-csv-paste')||{}).value||'';
-      const st  = document.getElementById('scan-master-status');
-      if (!raw.trim()) { st.innerHTML='<span style="color:#f87">Koi data nahi!</span>'; return; }
-      const lines = raw.trim().split(/\r?\n/);
-      if (lines.length < 2) { st.innerHTML='<span style="color:#f87">Sirf header hai, data nahi!</span>'; return; }
-      // Parse header
-      function splitCSV(line) {
-        const res=[]; let cur='',inQ=false;
-        for (let ch of line) { if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){res.push(cur.trim());cur='';}else{cur+=ch;} }
-        res.push(cur.trim()); return res.map(c=>c.replace(/^"|"$/g,'').trim());
-      }
-      const hdrs = splitCSV(lines[0]).map(h=>h.toLowerCase().replace(/\s+/g,''));
-      const ci = {
-        id:   hdrs.findIndex(h=>h.includes('empid')||h.includes('id')||h==='emp'),
-        name: hdrs.findIndex(h=>h.includes('name')),
-        dept: hdrs.findIndex(h=>h.includes('dept')||h.includes('department')),
-        desig:hdrs.findIndex(h=>h.includes('desig')),
-        mob:  hdrs.findIndex(h=>h.includes('mob')||h.includes('phone')||h.includes('mobile')),
-      };
-      if (ci.id<0||ci.name<0) { st.innerHTML='<span style="color:#f87">EmpID ya Name column nahi mila! Header check karo.</span>'; return; }
-      let added=0, skipped=0;
-      lines.slice(1).forEach(line=>{
-        if (!line.trim()) return;
-        const c = splitCSV(line);
-        const id = (c[ci.id]||'').toUpperCase().trim();
-        const name = (c[ci.name]||'').trim();
-        if (!id||!name) { skipped++; return; }
-        mdir[id] = {
-          name,
-          dept:  ci.dept>=0  ? (c[ci.dept]||'').trim()  : '',
-          designation: ci.desig>=0 ? (c[ci.desig]||'').trim() : '',
-          mobile: ci.mob>=0  ? (c[ci.mob]||'').trim()   : '',
-        };
-        added++;
-      });
-      sS(MK, mdir);
-      refreshDepts();
-      st.innerHTML = `<span style="color:#4ade80">✅ ${added} employees loaded! ${skipped?skipped+' skipped':''}</span>`;
-      setTimeout(()=>{ updateMasterBar(); document.getElementById('scan-master-panel')?.remove(); toast('✅ '+added+' employees master mein add ho gaye!','ok'); }, 1200);
-    };
-
-    window.clearScanMaster = function() {
-      if (!confirm('Master data clear karna chahte ho?')) return;
-      mdir = {}; sS(MK, mdir); updateMasterBar();
-      toast('Master data clear ho gaya','wa');
-    };
-
-    // Auto-try GS if URL is set
-    window.scannerFetchMaster = async function() {
-      if (!gsSettings.url) { updateMasterBar(); return; }
-      bar.className = 'mbar'; bar.innerHTML = '⏳ GS se Master Data load ho raha hai...';
-      try {
-        const res = await fetch(gsSettings.url + '?action=fetchMaster&t=' + Date.now(), {cache:'no-store'});
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        if (data.status !== 'ok') throw new Error(data.message||'API error');
-        const employees = data.employees||{};
-        if (Object.keys(employees).length) {
-          Object.assign(mdir, employees);
-          sS(MK, mdir);
-          refreshDepts();
-          toast('✅ GS se ' + Object.keys(employees).length + ' employees loaded!','ok');
-        }
-      } catch(e) { console.warn('GS master fetch failed:', e.message); }
-      updateMasterBar();
-    };
-
-    updateMasterBar();
-    if (gsSettings.url) setTimeout(()=>window.scannerFetchMaster(), 500);
-
-  } else if (MODE === 'view') {
-    badge.className = 'mbadge mview'; badge.textContent = '👁 Viewer';
-    tabs.style.display = 'none';
-    document.getElementById('pg-att').classList.remove('on');
-    document.getElementById('vmode').style.display = 'block';
-    document.getElementById('vdate').value = ''; // No default date filter — show all records
-    document.getElementById('vtitle').textContent = DEPT ? DEPT+' — Attendance Dashboard' : 'Full Attendance Dashboard';
-    document.getElementById('vsub').textContent   = DEPT ? 'Sirf '+DEPT+' department | Read-only' : 'Sab departments | Read-only';
-    vdept = DEPT;
-
-    // ── VIEWER: Fetch from Apps Script (works on ALL devices, no login needed) ──
-    window.fetchAndRender = function() {
-      var vsub = document.getElementById('vsub');
-      if (vsub) vsub.textContent = '⏳ Data load ho raha hai...';
-
-      // Check GS URL configured
-      var gsUrl = gsSettings.url || '';
-      var sheetName = gsSettings.sheet || 'Attendance';
-
-      if (!gsUrl) {
-        // Show setup banner
-        var setupBanner = document.getElementById('vgs-setup');
-        if (setupBanner) setupBanner.style.display = 'block';
-        if (vsub) vsub.textContent = '⚠ Google Sheets URL set nahi hai — neeche URL daalo';
-        recs = gS(SK); renderV(); return;
-      }
-
-      // Build fetch URL — Apps Script GET with action=fetch
-      var fetchUrl = gsUrl + '?action=fetch&sheet=' + encodeURIComponent(sheetName) + '&t=' + Date.now();
-
-      fetch(fetchUrl, {cache: 'no-store'})
-        .then(function(r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.text();
-        })
-        .then(function(text) {
-          // Strip JSONP wrapper if present
-          var json = text.trim();
-          if (json.startsWith('cb(') || json.indexOf('({')>0) {
-            json = json.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, '');
-          }
-          var data = JSON.parse(json);
-          if (data.status !== 'ok') throw new Error(data.message || 'API error');
-
-          var records = data.records || [];
-          if (!records.length) { recs=[]; renderV(); if(vsub) vsub.textContent='✅ 0 records (Sheet khaali hai)'; return; }
-
-          // Normalize — Apps Script returns time as "HH:mm" strings, convert to fake ISO for fT()
-          var todayStr = dStr(new Date());
-          recs = records.map(function(r) {
-            var dateVal = r.date || '';
-            // Normalize date: YYYY-MM-DD → keep, DD-MM-YYYY → convert to YYYY-MM-DD for dStr comparison
-            // We store as YYYY-MM-DD internally
-            if (/^\d{2}-\d{2}-\d{4}$/.test(dateVal)) {
-              var p = dateVal.split('-');
-              dateVal = p[2]+'-'+p[1]+'-'+p[0]; // DD-MM-YYYY → YYYY-MM-DD
-            }
-            // Convert HH:mm punch times to full ISO for fT() compatibility
-            function toISO(timeStr, dateStr) {
-              if (!timeStr) return '';
-              if (timeStr.length <= 5) return dateStr + 'T' + timeStr + ':00';
-              return timeStr; // already ISO
-            }
-            return {
-              empId: String(r.empId || '').toUpperCase().trim(),
-              name:  r.name  || '',
-              dept:  r.dept  || '',
-              date:  dateVal,
-              shift: r.shift || '',
-              loc:   r.loc   || 'Main',
-              in:    toISO(r.in,  dateVal),
-              out:   toISO(r.out, dateVal),
-              duration: r.duration || ''
-            };
-          }).filter(function(r){ return r.empId; });
-
-          renderV();
-          if(vsub) vsub.textContent = 'Sab departments | Read-only | ✅ ' + recs.length + ' records loaded';
-          // Hide setup banner if showing
-          var setupBanner = document.getElementById('vgs-setup');
-          if (setupBanner) setupBanner.style.display = 'none';
-        })
-        .catch(function(err){
-          console.error('Viewer fetch error:', err);
-          // Fallback: try public CSV from hardcoded sheet ID
-          var SHEET_ID = '1Po78BwBYkabon0J0RGg8dTZeN7ZYlP_Gy4dl44P_hbc';
-          var csvUrl = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:csv&gid=604979772&t='+Date.now();
-          if(vsub) vsub.textContent = '🔄 Fallback CSV se try kar raha hai...';
-          fetch(csvUrl, {cache:'no-store'})
-            .then(function(r2){ if(!r2.ok) throw new Error('CSV HTTP '+r2.status); return r2.text(); })
-            .then(function(csv){
-              var lines = csv.trim().split('\n');
-              if (lines.length < 2) { recs=[]; renderV(); if(vsub) vsub.textContent='⚠ Sheet mein koi data nahi (public share check karo)'; return; }
-              function pl(line) {
-                var res=[],cur='',inQ=false;
-                for(var i=0;i<line.length;i++){var ch=line[i];if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){res.push(cur);cur='';}else{cur+=ch;}}
-                res.push(cur);return res.map(function(c){return c.replace(/^"|"$/g,'').trim();});
-              }
-              var hdrs=pl(lines[0]).map(function(h){return h.toLowerCase().replace(/\s+/g,'');});
-              function col(kws){for(var k=0;k<kws.length;k++)for(var h=0;h<hdrs.length;h++)if(hdrs[h].indexOf(kws[k])>=0)return h;return -1;}
-              var ci={empId:col(['empid','emp']),name:col(['name']),dept:col(['department','dept']),date:col(['date']),shift:col(['shift']),loc:col(['location','loc']),pIn:col(['punchin']),pOut:col(['punchout'])};
-              function nd(d){
-                if(!d)return'';
-                if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;
-                var m=d.match(/^(\d{2})-(\d{2})-(\d{4})/);if(m)return m[3]+'-'+m[2]+'-'+m[1];
-                try{var dt=new Date(d);if(!isNaN(dt.getTime()))return dStr(dt);}catch(e){}
-                return d;
-              }
-              function toISO(t,dateStr){if(!t)return'';if(t.length<=5)return dateStr+'T'+t+':00';return t;}
-              var parsed=[];
-              for(var i=1;i<lines.length;i++){
-                if(!lines[i].trim())continue;
-                var c=pl(lines[i]);
-                var empId=ci.empId>=0?c[ci.empId]:c[0];
-                if(!empId||empId==='Emp ID')continue;
-                var dateVal=nd(ci.date>=0?c[ci.date]:c[5]);
-                parsed.push({empId:empId,name:(ci.name>=0?c[ci.name]:c[1])||'',dept:(ci.dept>=0?c[ci.dept]:c[2])||'',date:dateVal,shift:(ci.shift>=0?c[ci.shift]:c[6])||'',loc:(ci.loc>=0?c[ci.loc]:c[7])||'Main',in:toISO(ci.pIn>=0?c[ci.pIn]:c[8],dateVal),out:toISO(ci.pOut>=0?c[ci.pOut]:c[9],dateVal),duration:''});
-              }
-              recs=parsed; renderV();
-              if(vsub) vsub.textContent='✅ '+recs.length+' records (CSV fallback)';
-            })
-            .catch(function(err2){
-              if(vsub) vsub.textContent='❌ Data load nahi hua: '+err2.message+' — Apps Script URL check karo';
-              recs=gS(SK); renderV();
-            });
-        });
-    }
-
-    // Show GS setup banner if no URL configured
-    const vgsSetup = document.getElementById('vgs-setup');
-    if (vgsSetup) vgsSetup.style.display = gsSettings.url ? 'none' : 'block';
-
-    window.fetchAndRender();
-    const rb2 = document.getElementById('refresh-badge');
-    if (rb2) { rb2.style.display='inline'; rb2.textContent='🔄 Auto Refresh: 15s'; }
-    // AUTO REFRESH every 15 seconds in viewer — from Google Sheets
-    setInterval(() => { window.fetchAndRender && window.fetchAndRender(); }, 15000);
-
+(function init() {
+  var saved = loadSavedList();
+  if (saved.trim()) {
+    checkAll();
+    toggleAutoRefresh();
   } else {
-    // ADMIN mode
-    badge.className = 'mbadge madmin'; badge.textContent = '⚙ Admin';
-    loadGSForm();
-    const rb = document.getElementById('refresh-badge');
-    if (rb) rb.style.display = 'inline';
-    // AUTO REFRESH admin dashboard every 10 seconds (local data)
-    setInterval(() => {
-      recs = gS(SK);
-      mdir = gS(MK);
-      refreshDepts();
-      doFilter();
-      updStats();
-    }, 10000);
-    // AUTO PULL from GS every 15 seconds (scanner data from all devices)
-    setTimeout(() => startAutoPull(), 2000); // 2 sec baad start karo
-  }
-
-  if (MODE !== 'view') {
-    document.getElementById('fdate').value = dStr(new Date());
-    refreshDepts();
-    doFilter();
+    toggleEdit();
+    renderEmpty(true);
   }
 })();
-
-// ══════════════════════════════════════
-// CLOCK
-// ══════════════════════════════════════
-setInterval(() => {
-  document.getElementById('clk').textContent = new Date().toLocaleTimeString('hi-IN',{hour12:false});
-}, 1000);
-
-// ══════════════════════════════════════
-// TABS
-// ══════════════════════════════════════
-function showTab(name, el) {
-  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('on'));
-  document.getElementById('pg-'+name).classList.add('on');
-  el.classList.add('on');
-  if (name==='master') renderM();
-  if (name==='links')  genView();
-}
-
-// ══════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════
-function dStr(d) { return d.toISOString().slice(0,10); }
-function shift(d) { const m=d.getHours()*60+d.getMinutes(); return (m>=19*60+30||m<7*60+30)?'Night':'Day'; }
-function fT(iso) {
-  if(!iso)return'—';
-  // Already HH:mm format (from GS)
-  if(/^\d{2}:\d{2}$/.test(iso)) return iso;
-  // ISO format
-  try { return new Date(iso).toLocaleTimeString('hi-IN',{hour12:false,hour:'2-digit',minute:'2-digit'}); } catch(e){ return iso; }
-}
-function dur(i,o,dateStr) {
-  if(!i||!o) return '—';
-  // If HH:mm format, prepend date to make parseable
-  function toISO(t, d) {
-    if (/^\d{2}:\d{2}$/.test(String(t))) return (d||'2000-01-01') + 'T' + t + ':00';
-    return t;
-  }
-  const ms = new Date(toISO(o,dateStr)) - new Date(toISO(i,dateStr));
-  if(ms<=0) return '—';
-  return Math.floor(ms/3600000)+'h '+Math.floor((ms%3600000)/60000)+'m';
-}
-function sBadge(s) { return '<span class="badge '+(s==='Day'?'bd2':'bn')+'">'+s+'</span>'; }
-function chip(t) { return '<span style="background:var(--sf2);border-radius:4px;padding:1px 7px;font-size:.72rem">'+t+'</span>'; }
-function g(id) { return document.getElementById(id); }
-
-// Scanner sees only its own location; admin/viewer sees all
-function baseR() {
-  if (MODE==='scan' && LOC) return recs.filter(r=>r.loc===LOC);
-  return recs;
-}
-
-// ══════════════════════════════════════
-// SCAN
-// ══════════════════════════════════════
-function doScan() {
-  const raw = g('sinp').value.trim();
-  if (!raw) return;
-  const id  = raw.toUpperCase();
-  const now = new Date();
-  const dt  = dStr(now);
-  const sh  = shift(now);
-  const loc = LOC || 'Main';
-  const emp = mdir[id];
-  const dept = emp ? emp.dept : (g('dsel').value || 'Unknown');
-  const name = emp ? emp.name : (g('enm').value.trim() || id);
-
-  if (!emp) { mdir[id]={name,dept,designation:'',mobile:''}; sS(MK,mdir); refreshDepts(); }
-
-  let sess = recs.find(r => r.empId===id && r.date===dt && r.shift===sh && !r.out);
-  if (!sess) {
-    sess = {empId:id,name,dept,date:dt,shift:sh,loc,in:now.toISOString(),out:null};
-    recs.push(sess);
-    anim('go'); showLast(sess,'IN');
-    toast('✅ PUNCH IN — '+name+' ('+dept+') | '+sh+' @ '+loc,'ok');
-  } else if (!sess.out) {
-    sess.out = now.toISOString(); sess.outLoc = loc;
-    anim('wa'); showLast(sess,'OUT');
-    toast('🔴 PUNCH OUT — '+name+' | '+dur(sess.in,sess.out),'ok');
-  } else {
-    toast('⚠ '+name+' — Already IN & OUT ('+sh+' Shift)','wa');
-    anim('wa');
-  }
-
-  sS(SK,recs);
-  sendToGS(sess); // ← Google Sheets pe automatically save
-  g('sinp').value=''; g('enm').value=''; g('sinp').focus();
-  doFilter();
-}
-
-function anim(cls) {
-  const ring=g('sring'), ico=g('sico'), stat=g('sstat');
-  ring.className='sring an'; ico.textContent='📡';
-  stat.className='sstatus'; stat.textContent='Processing...';
-  setTimeout(()=>{
-    ring.className='sring '+cls;
-    ico.textContent=cls==='go'?'✅':'🔴';
-    stat.className='sstatus '+(cls==='go'?'ok':'wa');
-    stat.textContent=cls==='go'?'Punch IN Done!':'Punch OUT Done!';
-    setTimeout(()=>{ring.className='sring';ico.textContent='🪪';stat.className='sstatus';stat.textContent='Card ID scan karein ya type karein';},2400);
-  },600);
-}
-
-function showLast(s,type) {
-  const b=g('lbox'); b.className='lbox on';
-  b.innerHTML=
-    '<div><span class="k">ID: </span><b>'+s.empId+'</b> | <span class="k">Name: </span>'+s.name+'</div>'+
-    '<div><span class="k">Dept: </span>'+s.dept+' | <span class="k">Shift: </span>'+sBadge(s.shift)+'</div>'+
-    '<div><span class="k">IN: </span>'+fT(s.in)+' | <span class="k">OUT: </span>'+fT(s.out)+'</div>'+
-    '<div style="margin-top:3px"><span class="badge '+(type==='IN'?'bi':'bo')+'">'+type+'</span></div>';
-}
-
-// ══════════════════════════════════════
-// FILTERS + TABLE
-// ══════════════════════════════════════
-function doFilter() {
-  const loc  = g('floc')  ? g('floc').value  : '';
-  const dept = g('fd')   ? g('fd').value   : '';
-  const date = g('fdate')? g('fdate').value : '';
-  const sh   = g('fsh')  ? g('fsh').value  : '';
-  const pt   = g('fpt')  ? g('fpt').value  : '';
-  const base = baseR();
-  if      (pt==='IN')  filt=base.filter(r=>(!loc||r.loc===loc)&&(!dept||r.dept===dept)&&(!date||r.date===date)&&(!sh||r.shift===sh)&&!r.out);
-  else if (pt==='OUT') filt=base.filter(r=>(!loc||r.loc===loc)&&(!dept||r.dept===dept)&&(!date||r.date===date)&&(!sh||r.shift===sh)&&!!r.out);
-  else                 filt=base.filter(r=>(!loc||r.loc===loc)&&(!dept||r.dept===dept)&&(!date||r.date===date)&&(!sh||r.shift===sh));
-  renderT(); updStats(); renderChart();
-}
-
-function clearFilt() {
-  ['floc','fd','fsh','fpt'].forEach(id=>{if(g(id))g(id).value='';});
-  if(g('fdate')) g('fdate').value = MODE==='scan'?dStr(new Date()):'';
-  filt=[...baseR()]; renderT(); updStats(); renderChart();
-}
-
-function renderT() {
-  const tb=g('atbody'); if(!tb) return;
-  if(g('rcount')) g('rcount').textContent=filt.length+' records';
-  if(!filt.length){tb.innerHTML='<tr><td colspan="10" class="nd">Koi record nahi</td></tr>';return;}
-  // Sort: handle both ISO strings and HH:mm strings
-  function toSortKey(r) {
-    if (!r.in) return '';
-    // HH:mm format — prefix date for sort
-    if (/^\d{2}:\d{2}/.test(String(r.in))) return (r.date||'') + 'T' + r.in;
-    return r.in;
-  }
-  const sorted=[...filt].sort((a,b)=> toSortKey(b).localeCompare(toSortKey(a)));
-  tb.innerHTML=sorted.map((r,i)=>
-    '<tr>'+
-    '<td class="tm" style="color:var(--mu)">'+(i+1)+'</td>'+
-    '<td class="tm" style="color:var(--cy)">'+r.empId+'</td>'+
-    '<td>'+r.name+'</td>'+
-    '<td>'+chip(r.dept)+'</td>'+
-    '<td style="font-size:.76rem;color:var(--am)">📍 '+(r.loc||'Main')+'</td>'+
-    '<td class="tm" style="font-size:.76rem">'+r.date+'</td>'+
-    '<td>'+sBadge(r.shift)+'</td>'+
-    '<td class="tm" style="color:var(--gn)">'+fT(r.in)+'</td>'+
-    '<td class="tm" style="color:'+(r.out?'var(--rd)':'var(--mu)')+'">'+fT(r.out)+'</td>'+
-    '<td style="font-size:.76rem;color:var(--mu)">'+durDisp(r)+'</td>'+
-    '</tr>'
-  ).join('');
-}
-
-// Duration display — handle both ISO and HH:mm
-function durDisp(r) {
-  if (r.duration) return r.duration;
-  if (!r.in || !r.out) return '—';
-  return dur(r.in, r.out, r.date);
-}
-
-function updStats() {
-  const today=dStr(new Date()), base=baseR();
-  const todayR=base.filter(r=>r.date===today);
-  if(g('s-tot')) g('s-tot').textContent=base.length;
-  if(g('s-tod')) g('s-tod').textContent=todayR.length;
-  if(g('s-day')) g('s-day').textContent=base.filter(r=>r.shift==='Day').length;
-  if(g('s-ngt')) g('s-ngt').textContent=base.filter(r=>r.shift==='Night').length;
-  if(g('s-in'))  g('s-in').textContent =base.filter(r=>r.in&&!r.out).length;
-  if(g('s-out')) g('s-out').textContent=base.filter(r=>r.out).length;
-}
-
-function renderChart() {
-  const dm={};
-  filt.forEach(r=>{if(!dm[r.dept])dm[r.dept]={Day:0,Night:0};dm[r.dept][r.shift]++;});
-  const labels=Object.keys(dm);
-  const ctx=g('dchart'); if(!ctx) return;
-  if(dch) dch.destroy();
-  if(!labels.length) return;
-  dch=new Chart(ctx.getContext('2d'),{
-    type:'bar',
-    data:{labels,datasets:[
-      {label:'Day',data:labels.map(d=>dm[d].Day),backgroundColor:'rgba(245,158,11,.7)',borderColor:'#F59E0B',borderWidth:1,borderRadius:4},
-      {label:'Night',data:labels.map(d=>dm[d].Night),backgroundColor:'rgba(129,140,248,.7)',borderColor:'#818CF8',borderWidth:1,borderRadius:4},
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{labels:{color:'#E2E8F0'}},tooltip:{mode:'index',intersect:false}},
-      scales:{x:{ticks:{color:'#94A3B8'},grid:{color:'rgba(51,65,85,.5)'}},
-              y:{ticks:{color:'#94A3B8',stepSize:1},grid:{color:'rgba(51,65,85,.5)'},beginAtZero:true}}}
-  });
-}
-
-// ══════════════════════════════════════
-// DEPT DROPDOWNS
-// ══════════════════════════════════════
-function refreshDepts() {
-  const depts=[...new Set([
-    ...Object.values(mdir).map(e=>e.dept),
-    ...recs.map(r=>r.dept)
-  ].filter(Boolean))].sort();
-  [['fd','<option value="">Sab</option>'],['dsel','<option value="">— Auto —</option>']].forEach(([id,ph])=>{
-    const el=g(id); if(!el) return;
-    const cv=el.value;
-    el.innerHTML=ph+depts.map(d=>'<option'+(d===cv?' selected':'')+'>'+d+'</option>').join('');
-  });
-  // Populate location filter (admin only)
-  const locEl=g('floc'); if(locEl){
-    const locs=[...new Set(recs.map(r=>r.loc||'Main').filter(Boolean))].sort();
-    const cv=locEl.value;
-    locEl.innerHTML='<option value="">Sab Locations</option>'+locs.map(l=>'<option'+(l===cv?' selected':'')+'>'+l+'</option>').join('');
-  }
-}
-
-// ══════════════════════════════════════
-// CSV
-// ══════════════════════════════════════
-function csvDL(rows,name){
-  const c=rows.map(r=>r.map(x=>'"'+String(x||'').replace(/"/g,'""')+'"').join(',')).join('\n');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob(['\uFEFF'+c],{type:'text/csv;charset=utf-8;'}));
-  a.download=name; a.click();
-}
-function dlCSV(){
-  if(!filt.length){toast('Koi record nahi!','wa');return;}
-  csvDL([['Emp ID','Name','Department','Date','Shift','Location','Punch IN','Punch OUT','Duration'],
-    ...filt.map(r=>[r.empId,r.name,r.dept,r.date,r.shift,r.loc||'Main',fT(r.in),fT(r.out),dur(r.in,r.out)])],
-    'attendance_'+dStr(new Date())+'.csv');
-  toast(filt.length+' records download!','ok');
-}
-function clrAll(){
-  if(!confirm('Sab attendance records delete?'))return;
-  recs=[];filt=[];sS(SK,recs);
-  if(g('lbox'))g('lbox').className='lbox';
-  renderT();updStats();renderChart();toast('Data clear','wa');
-}
-
-// Scanner mode — sirf is location/device ka data clear karo
-function clrLocalScan(){
-  const locText = LOC ? ' ("'+LOC+'" location ka)' : '';
-  if(!confirm('Is device'+locText+' ka attendance data clear karna chahte ho? Yeh sirf is browser se hatega, Google Sheet se nahi.'))return;
-  if (LOC) {
-    // Sirf is location ka data hatao
-    recs = recs.filter(r => r.loc !== LOC);
-  } else {
-    recs = [];
-  }
-  filt = [...recs];
-  sS(SK, recs);
-  renderT(); updStats(); renderChart();
-  toast('✅ Is device ka data clear ho gaya','ok');
-}
-
-// ══════════════════════════════════════
-// MASTER — FILE UPLOAD
-// ══════════════════════════════════════
-function onDrop(e){e.preventDefault();g('uzone').classList.remove('drag');const f=e.dataTransfer.files[0];if(f)pFile(f);}
-function onFile(e){const f=e.target.files[0];if(f)pFile(f);e.target.value='';}
-function pFile(file){
-  if(!file.name.endsWith('.csv')){toast('Sirf .csv files!','wa');return;}
-  const r=new FileReader(); r.onload=ev=>pCSV(ev.target.result); r.readAsText(file,'UTF-8');
-}
-function pCSV(text){
-  text=text.replace(/^\uFEFF/,'');
-  const lines=text.split(/\r?\n/).filter(l=>l.trim());
-  if(lines.length<2){toast('File mein data nahi!','wa');return;}
-  const delim=lines[0].includes('\t')?'\t':',';
-  const pr=line=>{
-    const res=[];let cur='',q=false;
-    for(const ch of line){if(ch==='"'){q=!q;}else if(ch===delim&&!q){res.push(cur.trim());cur='';}else{cur+=ch;}}
-    res.push(cur.trim());return res;
-  };
-  const hdrs=pr(lines[0]).map(h=>h.replace(/^"|"$/g,'').toLowerCase().replace(/[\s_]/g,''));
-  const al={
-    employeeid:['employeeid','emp_id','empid','employee_id','id','code','empcode'],
-    name:['name','employeename','emp_name','fullname','full_name'],
-    department:['department','dept','department_name'],
-    designation:['designation','desig','position','role'],
-    mobile:['mobile','phone','contact','mobileno']
-  };
-  const cm={};
-  hdrs.forEach((h,i)=>Object.entries(al).forEach(([k,vs])=>{if(vs.includes(h))cm[k]=i;}));
-  if(cm.employeeid===undefined||cm.name===undefined||cm.department===undefined){
-    toast('EmployeeID, Name, Department columns nahi mile!','wa');return;
-  }
-  pdata=lines.slice(1).map(line=>{
-    const c=pr(line);
-    return{
-      empId:(c[cm.employeeid]||'').replace(/^"|"$/g,'').toUpperCase().trim(),
-      name:(c[cm.name]||'').replace(/^"|"$/g,'').trim(),
-      dept:(c[cm.department]||'').replace(/^"|"$/g,'').trim(),
-      desig:cm.designation!==undefined?(c[cm.designation]||'').trim():'',
-      mob:cm.mobile!==undefined?(c[cm.mobile]||'').trim():''
-    };
-  }).filter(r=>r.empId&&r.name);
-  if(!pdata.length){toast('Valid rows nahi mili!','wa');return;}
-  showPrev();
-}
-function showPrev(){
-  const p=g('ppanel'); p.classList.add('on');
-  const newC=pdata.filter(r=>!mdir[r.empId]).length;
-  g('ptitle').textContent='Preview — '+pdata.length+' rows';
-  g('psub').textContent=newC+' naye | '+(pdata.length-newC)+' update honge';
-  g('perr').textContent='';
-  g('phead').innerHTML='<tr><th>Emp ID</th><th>Name</th><th>Department</th><th>Designation</th><th>Mobile</th></tr>';
-  g('pbody').innerHTML=pdata.slice(0,50).map(r=>
-    '<tr style="'+(mdir[r.empId]?'background:rgba(245,158,11,.06)':'')+'">'+
-    '<td class="tm" style="color:var(--cy)">'+(mdir[r.empId]?'<span style="font-size:.68rem;color:var(--am)">↻ </span>':'')+r.empId+'</td>'+
-    '<td>'+r.name+'</td><td>'+r.dept+'</td><td>'+(r.desig||'—')+'</td><td>'+(r.mob||'—')+'</td></tr>'
-  ).join('');
-  p.scrollIntoView({behavior:'smooth'});
-}
-function confirmUp(){
-  let a=0,u=0;
-  pdata.forEach(r=>{if(mdir[r.empId])u++;else a++;mdir[r.empId]={name:r.name,dept:r.dept,designation:r.desig,mobile:r.mob};});
-  sS(MK,mdir);pdata=[];
-  g('ppanel').classList.remove('on');
-  refreshDepts();renderM();updStats();
-  toast(a+' add, '+u+' update!','ok');
-}
-function cancelUp(){pdata=[];g('ppanel').classList.remove('on');}
-
-function renderM(){
-  const q=(g('msrch')?g('msrch').value:'').toLowerCase();
-  const entries=Object.entries(mdir)
-    .filter(([id,e])=>!q||id.toLowerCase().includes(q)||e.name.toLowerCase().includes(q)||e.dept.toLowerCase().includes(q))
-    .sort((a,b)=>a[0].localeCompare(b[0]));
-  if(g('mcnt')) g('mcnt').textContent=Object.keys(mdir).length;
-  const tb=g('mtbody'); if(!tb) return;
-  if(!entries.length){tb.innerHTML='<tr><td colspan="7" class="nd">Koi record nahi<br><small>CSV upload karein ya + Add</small></td></tr>';return;}
-  tb.innerHTML=entries.map(([id,e],i)=>
-    '<tr>'+
-    '<td class="tm" style="color:var(--mu)">'+(i+1)+'</td>'+
-    '<td class="tm" style="color:var(--cy)">'+id+'</td>'+
-    '<td>'+e.name+'</td>'+
-    '<td>'+chip(e.dept)+'</td>'+
-    '<td style="color:var(--mu);font-size:.76rem">'+(e.designation||'—')+'</td>'+
-    '<td style="color:var(--mu);font-size:.76rem">'+(e.mobile||'—')+'</td>'+
-    '<td>'+
-    '<button class="btn ba" style="padding:2px 8px;font-size:.71rem" onclick="openEditM(\''+id+'\')">Edit</button> '+
-    '<button class="btn br" style="padding:2px 8px;font-size:.71rem" onclick="delM(\''+id+'\')">Del</button>'+
-    '</td></tr>'
-  ).join('');
-}
-function dlTpl(){
-  csvDL([['EmployeeID','Name','Department','Designation','Mobile'],
-    ['E001','Ram Kumar','Production','Operator','9876543210'],
-    ['E002','Sita Devi','HR','Manager',''],['E003','Mohan Lal','IT','Developer','']],
-    'master_template.csv');
-  toast('Template download!','ok');
-}
-function dlMaster(){
-  const e=Object.entries(mdir);
-  if(!e.length){toast('Master data khaali!','wa');return;}
-  csvDL([['EmployeeID','Name','Department','Designation','Mobile'],
-    ...e.map(([id,v])=>[id,v.name,v.dept,v.designation||'',v.mobile||''])],
-    'master_'+dStr(new Date())+'.csv');
-  toast(e.length+' exported!','ok');
-}
-function clrMaster(){
-  if(!confirm('Sab master data delete?'))return;
-  mdir={};sS(MK,mdir);refreshDepts();renderM();updStats();toast('Master clear','wa');
-}
-
-// Manual sync for scanner on different device
-function doManualSync(){
-  const inp=document.createElement('input');
-  inp.type='file';inp.accept='.csv';
-  inp.onchange=e=>{const f=e.target.files[0];if(f)pFile(f);};
-  inp.click();
-}
-
-// ══════════════════════════════════════
-// MODAL
-// ══════════════════════════════════════
-function openAddM(){
-  editId=null;g('etitle').textContent='Employee Add';
-  ['eid','ename','edept','edesig','emob'].forEach(id=>g(id).value='');
-  g('eid').disabled=false; g('emod').classList.add('on');
-}
-function openEditM(id){
-  editId=id;const e=mdir[id];g('etitle').textContent='Edit Employee';
-  g('eid').value=id;g('ename').value=e.name;g('edept').value=e.dept;
-  g('edesig').value=e.designation||'';g('emob').value=e.mobile||'';
-  g('eid').disabled=true;g('emod').classList.add('on');
-}
-function closeEM(){g('emod').classList.remove('on');}
-function saveEM(){
-  const id=g('eid').value.trim().toUpperCase(),name=g('ename').value.trim(),dept=g('edept').value.trim();
-  if(!id||!name||!dept){toast('ID, Name, Dept zaroori!','wa');return;}
-  mdir[id]={name,dept,designation:g('edesig').value.trim(),mobile:g('emob').value.trim()};
-  sS(MK,mdir);refreshDepts();renderM();updStats();closeEM();toast(name+' saved!','ok');
-}
-function delM(id){
-  if(!confirm((mdir[id]?mdir[id].name:id)+' delete?'))return;
-  delete mdir[id];sS(MK,mdir);refreshDepts();renderM();updStats();toast('Deleted','wa');
-}
-
-// ══════════════════════════════════════
-// LINKS
-// ══════════════════════════════════════
-function bUrl(){return location.origin+location.pathname;}
-function cpTxt(txt){
-  navigator.clipboard.writeText(txt).then(()=>toast('Copied!','ok')).catch(()=>{
-    const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('Copied!','ok');
-  });
-}
-function genScan(){
-  const loc=g('linp').value.trim();
-  if(!loc){toast('Location name daalo','wa');return;}
-  const url=bUrl()+'?mode=scan&loc='+encodeURIComponent(loc);
-  const cont=g('scan-links');
-  const old=cont.querySelector('[data-loc="'+loc+'"]');
-  if(old) old.remove();
-  const div=document.createElement('div');
-  div.className='dli';div.setAttribute('data-loc',loc);
-  const safeUrl=url.replace(/'/g,"\\'");
-  div.innerHTML='<span class="dn">📍 '+loc+'</span><a href="'+url+'" target="_blank" style="color:var(--cy);font-size:.73rem;word-break:break-all;flex:1;text-decoration:none">'+url+'</a><button class="btn bc" style="padding:2px 9px;font-size:.71rem" onclick="cpTxt(\''+safeUrl+'\')">Copy</button>';
-  cont.appendChild(div);
-  cpTxt(url);
-  toast(loc+' scanner link copied!','ok');
-  g('linp').value='';
-}
-function genView(){
-  const base=bUrl();
-  const allUrl=base+'?mode=view';
-  const alvLink = g('alvlink');
-  if(alvLink){ alvLink.href=allUrl; alvLink.textContent=allUrl; }
-  const depts=[...new Set([...recs.map(r=>r.dept),...Object.values(mdir).map(e=>e.dept)].filter(Boolean))].sort();
-  const cont=g('view-links'); if(!cont) return;
-  if(!depts.length){cont.innerHTML='<div style="font-size:.76rem;color:var(--mu)">Master data ya attendance records hone chahiye</div>';return;}
-  cont.innerHTML=depts.map(d=>{
-    const url=base+'?mode=view&dept='+encodeURIComponent(d);
-    const su=url.replace(/'/g,"\\'");
-    return '<div class="dli"><span class="dn">'+d+'</span><a href="'+url+'" target="_blank" class="du" style="color:var(--cy);text-decoration:none">'+url+'</a><button class="btn bp" style="padding:2px 9px;font-size:.71rem" onclick="cpTxt(\''+su+'\')">Copy</button></div>';
-  }).join('');
-}
-
-// ══════════════════════════════════════
-// VIEWER MODE — full dashboard, ALL data
-// ══════════════════════════════════════
-function renderV(){
-  // In viewer mode, recs is already populated by fetchAndRender — don't overwrite from localStorage
-  if(MODE !== 'view') { recs=gS(SK); mdir=gS(MK); }
-  const date=g('vdate')?g('vdate').value:'';
-  const sh  =g('vsh')?g('vsh').value:'';
-  const vloc=g('vloc')?g('vloc').value:'';
-
-  // Populate location dropdown
-  const vlocEl=g('vloc');
-  if(vlocEl){
-    const locs=[...new Set(recs.map(r=>r.loc||'Main').filter(Boolean))].sort();
-    const cv=vlocEl.value;
-    vlocEl.innerHTML='<option value="">Sab Locations</option>'+locs.map(l=>'<option'+(l===cv?' selected':'')+'>'+l+'</option>').join('');
-  }
-
-  // Show ALL records if no date selected, else filter by date
-  let rows=recs.filter(r=>{
-    if(date && r.date!==date) return false;
-    if(vdept && r.dept!==vdept) return false;
-    if(sh && r.shift!==sh) return false;
-    if(vloc && (r.loc||'Main')!==vloc) return false;
-    return true;
-  });
-
-  // Stats — always show counts for selected filters
-  const todayStr = dStr(new Date());
-  const todayRows = rows.filter(r=>r.date===todayStr);
-  const vs=g('vstats');
-  if(vs) vs.innerHTML=
-    '<div class="sc s1"><div class="slb">All Records</div><div class="sv">'+rows.length+'</div></div>'+
-    '<div class="sc s2"><div class="slb">Aaj Present</div><div class="sv">'+todayRows.length+'</div></div>'+
-    '<div class="sc s3"><div class="slb">Day ☀</div><div class="sv">'+rows.filter(r=>r.shift==='Day').length+'</div></div>'+
-    '<div class="sc s4"><div class="slb">Night 🌙</div><div class="sv">'+rows.filter(r=>r.shift==='Night').length+'</div></div>'+
-    '<div class="sc s5"><div class="slb">Punch IN Only</div><div class="sv">'+rows.filter(r=>r.in&&!r.out).length+'</div></div>'+
-    '<div class="sc s6"><div class="slb">Punch OUT Done</div><div class="sv">'+rows.filter(r=>r.out).length+'</div></div>';
-
-  // Dept pills
-  {
-    const depts=[...new Set(rows.map(r=>r.dept).filter(Boolean))].sort();
-    const vp=g('vpills');
-    if(vp) vp.innerHTML=
-      '<button class="dp'+(vdept?'':' on')+'" onclick="setVD(\'\')">All</button>'+
-      depts.map(d=>'<button class="dp'+(d===vdept?' on':'')+'" onclick="setVD(\''+d+'\')">'+d+'</button>').join('');
-  }
-
-  // Chart — dept wise
-  const dm={};
-  rows.forEach(r=>{if(!dm[r.dept])dm[r.dept]={Day:0,Night:0};dm[r.dept][r.shift]++;});
-  const labels=Object.keys(dm);
-  const vc=g('vchart');
-  if(vc){
-    if(vch) vch.destroy();
-    if(labels.length){
-      vch=new Chart(vc.getContext('2d'),{
-        type:'bar',
-        data:{labels,datasets:[
-          {label:'Day',data:labels.map(d=>dm[d].Day),backgroundColor:'rgba(245,158,11,.7)',borderColor:'#F59E0B',borderWidth:1,borderRadius:4},
-          {label:'Night',data:labels.map(d=>dm[d].Night),backgroundColor:'rgba(129,140,248,.7)',borderColor:'#818CF8',borderWidth:1,borderRadius:4},
-        ]},
-        options:{responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{labels:{color:'#E2E8F0'}},tooltip:{mode:'index',intersect:false}},
-          scales:{x:{ticks:{color:'#94A3B8'},grid:{color:'rgba(51,65,85,.5)'}},
-                  y:{ticks:{color:'#94A3B8',stepSize:1},grid:{color:'rgba(51,65,85,.5)'},beginAtZero:true}}}
-      });
-    }
-  }
-
-  // Table — latest first, ALL data
-  const rc=g('vrcount'); if(rc) rc.textContent=rows.length+' records'+(date?' ('+date+')':' (Sab dates)');
-  const tb=g('vtbody'); if(!tb) return;
-  const sorted=[...rows].sort((a,b)=>new Date(b.in)-new Date(a.in));
-  if(!sorted.length){
-    tb.innerHTML='<tr><td colspan="10" class="nd">Koi record nahi'+(date?' — '+date:'')+'</td></tr>';
-    return;
-  }
-  tb.innerHTML=sorted.map((r,i)=>
-    '<tr>'+
-    '<td class="tm" style="color:var(--mu)">'+(i+1)+'</td>'+
-    '<td class="tm" style="color:var(--cy)">'+r.empId+'</td>'+
-    '<td>'+r.name+'</td>'+
-    '<td>'+chip(r.dept)+'</td>'+
-    '<td style="font-size:.76rem;color:var(--am)">📍 '+(r.loc||'Main')+'</td>'+
-    '<td class="tm" style="font-size:.76rem">'+r.date+'</td>'+
-    '<td>'+sBadge(r.shift)+'</td>'+
-    '<td class="tm" style="color:var(--gn)">'+fT(r.in)+'</td>'+
-    '<td class="tm" style="color:'+(r.out?'var(--rd)':'var(--mu)')+'">'+fT(r.out)+'</td>'+
-    '<td style="font-size:.76rem;color:var(--mu)">'+dur(r.in,r.out)+'</td>'+
-    '</tr>'
-  ).join('');
-}
-function setVD(d){vdept=d;renderV();}
-function dlV(){
-  const date=g('vdate')?g('vdate').value:'';
-  const sh=g('vsh')?g('vsh').value:'';
-  const vloc=g('vloc')?g('vloc').value:'';
-  const rows=recs.filter(r=>{
-    if(date && r.date!==date) return false;
-    if(vdept && r.dept!==vdept) return false;
-    if(sh && r.shift!==sh) return false;
-    if(vloc && (r.loc||'Main')!==vloc) return false;
-    return true;
-  });
-  if(!rows.length){toast('Koi data nahi!','wa');return;}
-  csvDL([['Emp ID','Name','Department','Location','Date','Shift','Punch IN','Punch OUT','Duration'],
-    ...rows.sort((a,b)=>new Date(b.in)-new Date(a.in)).map(r=>[r.empId,r.name,r.dept,r.loc||'Main',r.date,r.shift,fT(r.in),fT(r.out),dur(r.in,r.out)])],
-    'view_all_'+(date||dStr(new Date()))+'.csv');
-  toast('Export done! '+rows.length+' records','ok');
-}
-
-// ══════════════════════════════════════
-// TOAST
-// ══════════════════════════════════════
-let tt;
-function toast(msg,type){
-  const t=g('toast'); g('tmsg').textContent=msg;
-  t.style.borderColor=type==='ok'?'var(--gn)':'var(--am)';
-  t.classList.add('on'); clearTimeout(tt);
-  tt=setTimeout(()=>t.classList.remove('on'),3500);
-}
-
-// ══════════════════════════════════════
-// KEYBOARD
-// ══════════════════════════════════════
-document.addEventListener('keydown',e=>{
-  if(MODE!=='view'&&g('pg-att')&&g('pg-att').classList.contains('on')&&
-     document.activeElement.tagName!=='INPUT'&&
-     document.activeElement.tagName!=='SELECT'&&
-     document.activeElement.tagName!=='TEXTAREA'&&e.key.length===1){
-    const si=g('sinp'); if(si) si.focus();
-  }
-});
-document.getElementById('emod').addEventListener('click',function(e){if(e.target===this)closeEM();});
-
-// ══════════════════════════════════════
-// VIEWER — Save GS URL from banner
-// ══════════════════════════════════════
-function saveVGS() {
-  const url = (document.getElementById('vgs-url-inp')||{}).value?.trim() || '';
-  const sheet = (document.getElementById('vgs-sheet-inp')||{}).value?.trim() || 'Attendance';
-  if (!url) { alert('URL daalo pehle!'); return; }
-  gsSettings = { url, sheet: sheet || 'Attendance' };
-  sS(GSK, gsSettings);
-  const setup = document.getElementById('vgs-setup');
-  if (setup) setup.style.display = 'none';
-  toast('✅ URL save ho gaya! Data load ho raha hai...','ok');
-  if (window.fetchAndRender) window.fetchAndRender();
-}
 </script>
 </body>
 </html>
